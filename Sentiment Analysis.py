@@ -1,4 +1,5 @@
 import pandas as pd
+import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 from transformers import pipeline
 from collections import defaultdict
@@ -6,6 +7,36 @@ import re
 import matplotlib.pyplot as plt
 import tkinter as tk
 from tkinter import ttk
+from nltk.corpus import stopwords
+import spacy
+nltk.download('stopwords')
+
+# Get all NLTK stopwords from all languages
+nltkLanguages = stopwords.fileids()
+nltkStopwords = set()
+for lang in nltkLanguages:
+    nltkStopwords.update(stopwords.words(lang))
+
+# Load spaCy and get stopwords from all spaCy-supported languages
+spacyStopwords = set()
+spacyLanguages = [
+    "af", "ar", "bg", "bn", "ca", "cs", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "ga",
+    "gu", "he", "hi", "hr", "hu", "id", "is", "it", "kn", "lt", "lv", "mr", "nb", "nl",
+    "pl", "pt", "ro", "ru", "si", "sk", "sl", "sq", "sr", "sv", "ta", "te", "tl", "tr", "uk",
+    "ur", "zh"
+]
+
+for lang in spacyLanguages:
+    try:
+        nlp = spacy.blank(lang)
+        spacyStopwords.update(nlp.Defaults.stop_words)
+    except Exception as e:
+        print(f"Error loading stopwords for language '{lang}': {e}")
+
+# Combine all stopwords into a single set
+stopwords = nltkStopwords.union(spacyStopwords)
+
+
 
 # Load the dataset
 df = pd.read_csv('sentiment_dataset.csv')
@@ -61,15 +92,16 @@ word_data = defaultdict(lambda: {
 for _, row in df.iterrows():
     words = re.findall(r'\b\w+\b', row['text'].lower())
     for word in words:
-        word_data[word]['frequency'] += 1
-        word_data[word]['likes'] += row['likes']
-        word_data[word]['comments'] += row['comments']
-        word_data[word]['tone'] += sia.polarity_scores(word)['compound']
-        word_data[word]['impact'] += word_data[word]['tone'] * ((row['likes'] // 10) + row['comments'])
-        word_emotions = extract_emotions(word)
-        for i, emotion in enumerate(emotions):
-            word_data[word][f"emotion_{emotion}"] += word_emotions[i]
-            word_data[word][f"impact_{emotion}"] += word_emotions[i] * ((row['likes'] // 10) + row['comments'])
+        if word not in stopwords:
+            word_data[word]['frequency'] += 1
+            word_data[word]['likes'] += row['likes']
+            word_data[word]['comments'] += row['comments']
+            word_data[word]['tone'] += sia.polarity_scores(word)['compound']
+            word_data[word]['impact'] += word_data[word]['tone'] * ((row['likes'] // 10) + row['comments'])
+            word_emotions = extract_emotions(word)
+            for i, emotion in enumerate(emotions):
+                word_data[word][f"emotion_{emotion}"] += word_emotions[i]
+                word_data[word][f"impact_{emotion}"] += word_emotions[i] * ((row['likes'] // 10) + row['comments'])
 
 word_df = pd.DataFrame.from_dict(word_data, orient='index').reset_index()
 word_df.rename(columns={"index": "word"}, inplace=True)
