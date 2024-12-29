@@ -10,6 +10,8 @@ from tkinter import ttk
 from nltk.corpus import stopwords
 import spacy
 nltk.download('stopwords')
+from datasets import Dataset
+
 
 # Get all NLTK stopwords from all languages
 nltkLanguages = stopwords.fileids()
@@ -45,7 +47,7 @@ df = pd.read_csv('sentiment_dataset.csv')
 sia = SentimentIntensityAnalyzer()
 
 # Initialize Hugging Face emotion classification model
-emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-English-distilroberta-base")
+emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-English-distilroberta-base", device = 0, batch_size=64)
 
 # Add "tone" and "impact" columns
 df['tone'] = df['text'].apply(lambda x: sia.polarity_scores(x)['compound'])
@@ -59,14 +61,25 @@ df['frequency'] = df['text'].apply(lambda x: sum(frequency_map.get(word, 0) for 
 # Analyze emotions for each text and add as columns
 emotions = ["joy", "sadness", "anger", "surprise", "fear"]
 
-def extract_emotions(text):
-    results = emotion_classifier(text, top_k=None)
-    emotion_scores = {emotion['label']: emotion['score'] for emotion in results}
-    return [emotion_scores.get(emotion, 0) for emotion in emotions]
+hf_dataset = Dataset.from_pandas(df[['text']])
 
+# Process texts in batches
+def extract_emotions(batch):
+    results = emotion_classifier(batch['text'], truncation=True, top_k=None)
+    batch_emotion_scores = []
+    for text_result in results:
+        emotion_scores = {emotion['label']: emotion['score'] for emotion in text_result}
+        batch_emotion_scores.append([emotion_scores.get(emotion, 0) for emotion in emotions])
+    return {f"emotion_{emotion}": [scores[i] for scores in batch_emotion_scores] for i, emotion in enumerate(emotions)}
+
+# Apply batch processing
+batch_size = 64  # Adjust based on GPU memory
 emotion_columns = [f"emotion_{emotion}" for emotion in emotions]
-emotion_data = df['text'].apply(extract_emotions)
-df[emotion_columns] = pd.DataFrame(emotion_data.tolist(), index=df.index)
+hf_dataset = hf_dataset.map(extract_emotions, batched=True, batch_size=batch_size)
+
+# Convert back to DataFrame
+emotion_df = hf_dataset.to_pandas()
+df[emotion_columns] = emotion_df[emotion_columns]
 
 # Calculate impact for each emotion
 def calc_impact_emotion(row, emotion):
