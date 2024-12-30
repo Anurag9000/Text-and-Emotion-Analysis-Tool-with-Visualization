@@ -10,6 +10,7 @@ from nltk.corpus import stopwords
 import spacy
 from datasets import Dataset
 import pandas as pd
+import os
 nltk.download('stopwords')
 
 # Get all NLTK stopwords from all languages
@@ -90,7 +91,7 @@ def extract_emotions(batch):
     # Aggregate scores into a dictionary
     return {f"emotion_{emotion}": [float(scores[i]) for scores in batch_emotion_scores] for i, emotion in enumerate(emotions)}
 
-hf_dataset = hf_dataset.map(extract_emotions, batched=True, batch_size=256)
+hf_dataset = hf_dataset.map(extract_emotions, batched=True, batch_size=64)
 
 # Calculate impact for each emotion
 def calculate_impact_emotions(batch):
@@ -102,36 +103,64 @@ def calculate_impact_emotions(batch):
 
 hf_dataset = hf_dataset.map(calculate_impact_emotions, batched=True)
 
-# Save the processed dataset to CSV
-hf_dataset.to_csv('texts.csv', index=False)
+# Check for existence of 'texts.csv' and 'words.csv'
+def check_and_create_files():
+    texts_exists = os.path.exists('texts.csv')
+    words_exists = os.path.exists('words.csv')
 
-# Generate words.csv with 17 columns
-word_data = defaultdict(lambda: {
-    'frequency': 0,
-    'likes': 0,
-    'comments': 0,
-    'tone': 0,
-    'impact': 0,
-    **{f"emotion_{emotion}": 0 for emotion in emotions},
-    **{f"impact_{emotion}": 0 for emotion in emotions}
-})
+    if not texts_exists:
+        print("'texts.csv' is missing. Generating...")
+        create_texts_csv()
 
-for row in hf_dataset:
-    words = re.findall(r'\b\w+\b', row['text'].lower())
-    for word in words:
-        if word not in stopwords:
-            word_data[word]['frequency'] += 1
-            word_data[word]['likes'] += int(row['likes'])
-            word_data[word]['comments'] += int(row['comments'])
-            word_data[word]['tone'] += float(sia.polarity_scores(word)['compound'])
-            word_data[word]['impact'] += word_data[word]['tone'] * ((int(row['likes']) // 10) + int(row['comments']))
-            for emotion in emotions:
-                word_data[word][f"emotion_{emotion}"] += float(row[f"emotion_{emotion}"])
-                word_data[word][f"impact_{emotion}"] += float(row[f"emotion_{emotion}"]) * ((int(row['likes']) // 10) + int(row['comments']))
+    if not words_exists:
+        print("'words.csv' is missing. Generating...")
+        create_words_csv()
 
-word_df = pd.DataFrame.from_dict(word_data, orient='index').reset_index()
-word_df.rename(columns={"index": "word"}, inplace=True)
-word_df.to_csv('words.csv', index=False)
+    if texts_exists or words_exists:
+        regenerate = input("One or both files already exist. Do you want to regenerate them? (yes/no): ").strip().lower()
+        if regenerate == 'yes':
+            if texts_exists:
+                create_texts_csv()
+            if words_exists:
+                create_words_csv()
+
+# Create 'texts.csv'
+def create_texts_csv():
+    print("Creating 'texts.csv'...")
+    hf_dataset.to_csv('texts.csv', index=False)
+
+# Create 'words.csv'
+def create_words_csv():
+    print("Creating 'words.csv'...")
+    word_data = defaultdict(lambda: {
+        'frequency': 0,
+        'likes': 0,
+        'comments': 0,
+        'tone': 0,
+        'impact': 0,
+        **{f"emotion_{emotion}": 0 for emotion in emotions},
+        **{f"impact_{emotion}": 0 for emotion in emotions}
+    })
+
+    for row in hf_dataset:
+        words = re.findall(r'\b\w+\b', row['text'].lower())
+        for word in words:
+            if word not in stopwords:
+                word_data[word]['frequency'] += 1
+                word_data[word]['likes'] += int(row['likes'])
+                word_data[word]['comments'] += int(row['comments'])
+                word_data[word]['tone'] += float(sia.polarity_scores(word)['compound'])
+                word_data[word]['impact'] += word_data[word]['tone'] * ((int(row['likes']) // 10) + int(row['comments']))
+                for emotion in emotions:
+                    word_data[word][f"emotion_{emotion}"] += float(row[f"emotion_{emotion}"])
+                    word_data[word][f"impact_{emotion}"] += float(row[f"emotion_{emotion}"]) * ((int(row['likes']) // 10) + int(row['comments']))
+
+    word_df = pd.DataFrame.from_dict(word_data, orient='index').reset_index()
+    word_df.rename(columns={"index": "word"}, inplace=True)
+    word_df.to_csv('words.csv', index=False)
+
+# Execute file check
+check_and_create_files()
 
 # Load the main dataset and additional words dataset
 texts_df = hf_dataset.to_pandas()
