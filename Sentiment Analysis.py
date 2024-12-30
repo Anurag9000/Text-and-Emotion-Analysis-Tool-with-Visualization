@@ -12,6 +12,20 @@ from datasets import Dataset
 import pandas as pd
 import os
 nltk.download('stopwords')
+import torch
+
+def get_best_gpu():
+    best_gpu = -1
+    max_free_memory = 0
+
+    for i in range(torch.cuda.device_count()):
+        free_memory = torch.cuda.get_device_properties(i).total_memory - torch.cuda.memory_reserved(i)
+        if free_memory > max_free_memory:
+            max_free_memory = free_memory
+            best_gpu = i
+
+    return best_gpu
+
 
 # Get all NLTK stopwords from all languages
 nltkLanguages = stopwords.fileids()
@@ -45,7 +59,7 @@ hf_dataset = Dataset.from_csv('sentiment_dataset.csv')
 sia = SentimentIntensityAnalyzer()
 
 # Initialize Hugging Face emotion classification model
-emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-English-distilroberta-base", device=0)
+emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-English-distilroberta-base", device=get_best_gpu())
 
 # Add "tone" and "impact" columns
 def calculate_tone_impact(batch):
