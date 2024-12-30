@@ -1,4 +1,3 @@
-import pandas as pd
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 from transformers import pipeline
@@ -9,9 +8,9 @@ import tkinter as tk
 from tkinter import ttk
 from nltk.corpus import stopwords
 import spacy
-nltk.download('stopwords')
 from datasets import Dataset
-
+import pandas as pd
+nltk.download('stopwords')
 
 # Get all NLTK stopwords from all languages
 nltkLanguages = stopwords.fileids()
@@ -38,59 +37,73 @@ for lang in spacyLanguages:
 # Combine all stopwords into a single set
 stopwords = nltkStopwords.union(spacyStopwords)
 
-
-
-# Load the dataset
-df = pd.read_csv('sentiment_dataset.csv')
+# Load the dataset using Dataset API
+hf_dataset = Dataset.from_csv('sentiment_dataset.csv')
 
 # Initialize SentimentIntensityAnalyzer
 sia = SentimentIntensityAnalyzer()
 
 # Initialize Hugging Face emotion classification model
-emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-English-distilroberta-base", device = 0, batch_size=64)
+emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-English-distilroberta-base", device=0)
 
 # Add "tone" and "impact" columns
-df['tone'] = df['text'].apply(lambda x: sia.polarity_scores(x)['compound'])
-df['impact'] = df['tone'] * ((df['likes'] // 10) + df['comments'])
+def calculate_tone_impact(batch):
+    tones = [sia.polarity_scores(text)['compound'] for text in batch['text']]
+    impacts = [tone * ((int(likes) // 10) + int(comments)) for tone, likes, comments in zip(tones, batch['likes'], batch['comments'])]
+    return {"tone": tones, "impact": impacts}
+
+hf_dataset = hf_dataset.map(calculate_tone_impact, batched=True)
 
 # Calculate frequency column
-word_frequency = df['text'].str.split().explode().value_counts()
-frequency_map = word_frequency.to_dict()
-df['frequency'] = df['text'].apply(lambda x: sum(frequency_map.get(word, 0) for word in x.split()))
+def calculate_frequency(batch):
+    word_frequency = defaultdict(int)
+    for text in batch['text']:
+        words = text.split()
+        for word in words:
+            word_frequency[word] += 1
+    frequencies = [sum(word_frequency.get(word, 0) for word in text.split()) for text in batch['text']]
+    return {"frequency": frequencies}
+
+hf_dataset = hf_dataset.map(calculate_frequency, batched=True)
 
 # Analyze emotions for each text and add as columns
 emotions = ["joy", "sadness", "anger", "surprise", "fear"]
 
-hf_dataset = Dataset.from_pandas(df[['text']])
-
-# Process texts in batches
 def extract_emotions(batch):
-    results = emotion_classifier(batch['text'], truncation=True, top_k=None)
+    results = emotion_classifier(batch['text'], truncation=True)
+
     batch_emotion_scores = []
     for text_result in results:
-        emotion_scores = {emotion['label']: emotion['score'] for emotion in text_result}
+        # Check if text_result is a dictionary or list of dictionaries
+        if isinstance(text_result, dict):
+            # Process as a single result
+            emotion_scores = {emotion['label']: emotion['score'] for emotion in [text_result]}
+        elif isinstance(text_result, list):
+            # Process as a list of results
+            emotion_scores = {emotion['label']: emotion['score'] for emotion in text_result}
+        else:
+            raise TypeError(f"Unexpected structure for text_result: {type(text_result)}")
+
+        # Extract scores for the predefined emotions
         batch_emotion_scores.append([emotion_scores.get(emotion, 0) for emotion in emotions])
-    return {f"emotion_{emotion}": [scores[i] for scores in batch_emotion_scores] for i, emotion in enumerate(emotions)}
 
-# Apply batch processing
-batch_size = 64  # Adjust based on GPU memory
-emotion_columns = [f"emotion_{emotion}" for emotion in emotions]
-hf_dataset = hf_dataset.map(extract_emotions, batched=True, batch_size=batch_size)
+    # Aggregate scores into a dictionary
+    return {f"emotion_{emotion}": [float(scores[i]) for scores in batch_emotion_scores] for i, emotion in enumerate(emotions)}
 
-# Convert back to DataFrame
-emotion_df = hf_dataset.to_pandas()
-df[emotion_columns] = emotion_df[emotion_columns]
+hf_dataset = hf_dataset.map(extract_emotions, batched=True, batch_size=256)
 
 # Calculate impact for each emotion
-def calc_impact_emotion(row, emotion):
-    emotion_column = f"emotion_{emotion}"
-    return row[emotion_column] * ((row['likes'] // 10) + row['comments'])
+def calculate_impact_emotions(batch):
+    emotion_impacts = {}
+    for emotion in emotions:
+        emotion_column = f"emotion_{emotion}"
+        emotion_impacts[f"impact_{emotion}"] = [float(emotion_score) * ((int(likes) // 10) + int(comments)) for emotion_score, likes, comments in zip(batch[emotion_column], batch['likes'], batch['comments'])]
+    return emotion_impacts
 
-for emotion in emotions:
-    df[f"impact_{emotion}"] = df.apply(lambda row: calc_impact_emotion(row, emotion), axis=1)
+hf_dataset = hf_dataset.map(calculate_impact_emotions, batched=True)
 
-# Save the "texts" file
-df.to_csv('texts.csv', index=False)
+# Save the processed dataset to CSV
+hf_dataset.to_csv('texts.csv', index=False)
 
 # Generate words.csv with 17 columns
 word_data = defaultdict(lambda: {
@@ -99,31 +112,29 @@ word_data = defaultdict(lambda: {
     'comments': 0,
     'tone': 0,
     'impact': 0,
-    **{f"emotion_{emotion}": 0 for emotion in emotions}, **{f"impact_{emotion}": 0 for emotion in emotions}
+    **{f"emotion_{emotion}": 0 for emotion in emotions},
+    **{f"impact_{emotion}": 0 for emotion in emotions}
 })
 
-for _, row in df.iterrows():
+for row in hf_dataset:
     words = re.findall(r'\b\w+\b', row['text'].lower())
     for word in words:
         if word not in stopwords:
             word_data[word]['frequency'] += 1
-            word_data[word]['likes'] += row['likes']
-            word_data[word]['comments'] += row['comments']
-            word_data[word]['tone'] += sia.polarity_scores(word)['compound']
-            word_data[word]['impact'] += word_data[word]['tone'] * ((row['likes'] // 10) + row['comments'])
-            word_emotions = extract_emotions(word)
-            for i, emotion in enumerate(emotions):
-                word_data[word][f"emotion_{emotion}"] += word_emotions[i]
-                word_data[word][f"impact_{emotion}"] += word_emotions[i] * ((row['likes'] // 10) + row['comments'])
+            word_data[word]['likes'] += int(row['likes'])
+            word_data[word]['comments'] += int(row['comments'])
+            word_data[word]['tone'] += float(sia.polarity_scores(word)['compound'])
+            word_data[word]['impact'] += word_data[word]['tone'] * ((int(row['likes']) // 10) + int(row['comments']))
+            for emotion in emotions:
+                word_data[word][f"emotion_{emotion}"] += float(row[f"emotion_{emotion}"])
+                word_data[word][f"impact_{emotion}"] += float(row[f"emotion_{emotion}"]) * ((int(row['likes']) // 10) + int(row['comments']))
 
 word_df = pd.DataFrame.from_dict(word_data, orient='index').reset_index()
 word_df.rename(columns={"index": "word"}, inplace=True)
-
-# Save the words.csv file
 word_df.to_csv('words.csv', index=False)
 
 # Load the main dataset and additional words dataset
-texts_df = pd.read_csv('texts.csv')
+texts_df = hf_dataset.to_pandas()
 words_df = pd.read_csv('words.csv')
 
 # Initialize global variables for user input
