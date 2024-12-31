@@ -14,6 +14,9 @@ import os
 nltk.download('stopwords')
 import torch
 from transformers import AutoTokenizer, XLMRobertaTokenizer
+import psutil
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def get_best_gpu():
     best_gpu = -1
@@ -26,6 +29,30 @@ def get_best_gpu():
             best_gpu = i
 
     return best_gpu
+
+# Function to dynamically calculate optimal batch size
+def calcOptimalBatchSize(dataset, mapFunction):
+    initialBatchSize = 10
+    maxBatchSize = 1000000000000  # Set a large value for maxBatchSize
+    optimalBatchSize = initialBatchSize
+    cpuThreshold = 98  # Maximum CPU usage percentage for optimization
+
+    for batchSize in range(initialBatchSize, maxBatchSize, 10):
+        try:
+            # Perform the mapping operation with the current batch size
+            dataset.map(mapFunction, batched=True, batch_size=batchSize)
+            
+            # Check current CPU usage
+            currentCpuUsage = psutil.cpu_percent(interval=1)
+            if currentCpuUsage > cpuThreshold:
+                break
+
+            # Update optimal batch size if CPU usage is within the threshold
+            optimalBatchSize = batchSize
+        except Exception as e:
+            print(f"Error occurred with batch size {batchSize}: {e}")
+            break
+    return optimalBatchSize
 
 # Get all NLTK stopwords from all languages
 nltkLanguages = stopwords.fileids()
@@ -80,7 +107,7 @@ for model_name in models:
         print(f"Failed to load tokenizer for model: {model_name}. Error: {e}")
 
 
-emotion_classifiers = {model_name: AutoModelForSequenceClassification.from_pretrained(model_name) for model_name in models}
+emotion_classifiers = {model_name: AutoModelForSequenceClassification.from_pretrained(model_name).to(device) for model_name in models}
 
 # Add "tone" and "impact" columns
 def calculate_tone_impact(batch):
@@ -89,7 +116,9 @@ def calculate_tone_impact(batch):
     return {"tone": tones, "impact": impacts}
 
 try:
-    hf_dataset = hf_dataset.map(calculate_tone_impact, batched=True)
+    batchSizeToneImpact = calcOptimalBatchSize(hf_dataset, calculate_tone_impact)
+    print(batchSizeToneImpact)
+    hf_dataset = hf_dataset.map(calculate_tone_impact, batched=True, batch_size=batchSizeToneImpact)
 except Exception as e:
     print(f"Error mapping 'calculate_tone_impact': {e}")
 
@@ -104,14 +133,16 @@ def calculate_frequency(batch):
     return {"frequency": frequencies}
 
 try:
-    hf_dataset = hf_dataset.map(calculate_frequency, batched=True)
+    batchSizeFrequency = calcOptimalBatchSize(hf_dataset, calculate_frequency)
+    hf_dataset = hf_dataset.map(calculate_frequency, batched=True, batch_size=batchSizeFrequency)
 except Exception as e:
     print(f"Error mapping 'calculate_frequency': {e}")
 
 # Analyze emotions for each text and add as columns
-emotions = ["joy", "sadness", "anger", "surprise", "fear"]
+emotions = set()
 
 def extract_emotions(batch):
+    global emotions
     batch_emotion_scores = defaultdict(list)
     for model_name in models:
         if model_name not in tokenizers:
@@ -120,19 +151,21 @@ def extract_emotions(batch):
         try:
             tokenizer = tokenizers[model_name]
             classifier = emotion_classifiers[model_name]
-            inputs = tokenizer(batch['text'], truncation=True, padding=True, return_tensors="pt")
+            inputs = tokenizer(batch['text'], truncation=True, padding=True, return_tensors="pt").to(device)
             outputs = classifier(**inputs)
             scores = torch.softmax(outputs.logits, dim=-1).detach().cpu().numpy()
             labels = classifier.config.id2label
             for score in scores:
                 for idx, emotion in labels.items():
+                    emotions.add(emotion)
                     batch_emotion_scores[f"{model_name}_{emotion}"].append(score[idx])
         except Exception as e:
             print(f"Error processing model: {model_name}. Error: {e}")
     return batch_emotion_scores
 
 try:
-    hf_dataset = hf_dataset.map(extract_emotions, batched=True)
+    batchSizeEmotions = calcOptimalBatchSize(hf_dataset, extract_emotions)
+    hf_dataset = hf_dataset.map(extract_emotions, batched=True, batch_size=batchSizeEmotions)
 except Exception as e:
     print(f"Error mapping 'extract_emotions': {e}")
 
@@ -145,7 +178,8 @@ def calculate_impact_emotions(batch):
     return emotion_impacts
 
 try:
-    hf_dataset = hf_dataset.map(calculate_impact_emotions, batched=True)
+    batchSizeImpactEmotions = calcOptimalBatchSize(hf_dataset, calculate_impact_emotions)
+    hf_dataset = hf_dataset.map(calculate_impact_emotions, batched=True, batch_size=batchSizeImpactEmotions)
 except Exception as e:
     print(f"Error mapping 'calculate_impact_emotions': {e}")
 
@@ -153,16 +187,15 @@ except Exception as e:
 def check_and_create_files():
     texts_exists = os.path.exists('texts.csv')
     words_exists = os.path.exists('words.csv')
-
-try:
-    if not texts_exists:
-        print("'texts.csv' is missing. Generating...")
-        create_texts_csv()
-    if not words_exists:
-        print("'words.csv' is missing. Generating...")
-        create_words_csv()
-except Exception as e:
-    print(f"Error while creating files: {e}")
+    try:
+        if not texts_exists:
+            print("'texts.csv' is missing. Generating...")
+            create_texts_csv()
+        if not words_exists:
+            print("'words.csv' is missing. Generating...")
+            create_words_csv()
+    except Exception as e:
+        print(f"Error while creating files: {e}")
 
 
     if texts_exists or words_exists:
