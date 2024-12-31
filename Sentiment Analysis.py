@@ -25,10 +25,11 @@ from nltk.sentiment import SentimentIntensityAnalyzer
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class FileHandler:
-    def __init__(self, dataset, stopwords, emotions):
+    def __init__(self, dataset, stopwords, emotions, dataProcessor):
         self.dataset = dataset
         self.stopwords = stopwords
         self.emotions = emotions
+        self.dataProcessor = dataProcessor  # Store the dataProcessor instance
 
     def createTextsCsv(self, calculateToneImpact, calculateFrequency, dataProcessor):
         def addToneAndImpact(dataset):
@@ -78,37 +79,46 @@ class FileHandler:
         dataset.to_csv('texts.csv', index=False)
 
     def createWordsCsv(self):
-        sia = SentimentIntensityAnalyzer()
-
         def processWords(wordData, row):
+            # Tokenize the text into individual words
             words = re.findall(r'\b\w+\b', row['text'].lower())
             for word in words:
-                if word not in self.stopwords:
-                    wordData[word]['frequency'] += 1
-                    wordData[word]['likes'] += int(row['likes'])
-                    wordData[word]['comments'] += int(row['comments'])
-                    wordData[word]['tone'] += float(sia.polarity_scores(word)['compound'])
-                    wordData[word]['impact'] += wordData[word]['tone'] * (
+                # Run each word through the emotion models using self.dataProcessor
+                wordEmotionScores = self.dataProcessor.extractEmotions({"text": [word]})
+
+                if word not in wordData:
+                    # Initialize data structure for the word if not already present
+                    wordData[word] = {
+                        'frequency': 0,
+                        'likes': 0,
+                        'comments': 0,
+                        'tone': 0,
+                        'impact': 0,
+                        **{f"emotion_{emotion}": 0 for emotion in wordEmotionScores.keys()},
+                        **{f"impact_{emotion}": 0 for emotion in wordEmotionScores.keys()},
+                    }
+
+                # Increment frequency and aggregate likes/comments
+                wordData[word]['frequency'] += 1
+                wordData[word]['likes'] += int(row['likes'])
+                wordData[word]['comments'] += int(row['comments'])
+
+                # Add tone and impact
+                wordData[word]['tone'] += float(SentimentIntensityAnalyzer().polarity_scores(word)['compound'])
+                wordData[word]['impact'] += wordData[word]['tone'] * (
+                    (int(row['likes']) // 10) + int(row['comments'])
+                )
+
+                # Add emotion scores and impacts
+                for emotion, score in wordEmotionScores.items():
+                    wordData[word][f"emotion_{emotion}"] += score
+                    wordData[word][f"impact_{emotion}"] += score * (
                         (int(row['likes']) // 10) + int(row['comments'])
                     )
-                    for emotion in self.emotions:
-                        emotionKey = f"emotion_{emotion}"
-                        impactKey = f"impact_{emotion}"
-                        wordData[word][emotionKey] += float(row.get(emotionKey, 0))
-                        wordData[word][impactKey] += float(row.get(emotionKey, 0)) * (
-                            (int(row['likes']) // 10) + int(row['comments'])
-                        )
 
         print("Creating 'words.csv'...")
-        wordData = defaultdict(lambda: {
-            'frequency': 0,
-            'likes': 0,
-            'comments': 0,
-            'tone': 0,
-            'impact': 0,
-            **{f"emotion_{emotion}": 0 for emotion in self.emotions},
-            **{f"impact_{emotion}": 0 for emotion in self.emotions}
-        })
+        wordData = {}
+
         for row in self.dataset:
             try:
                 processWords(wordData, row)
@@ -118,6 +128,7 @@ class FileHandler:
         wordDf = pd.DataFrame.from_dict(wordData, orient='index').reset_index()
         wordDf.rename(columns={"index": "word"}, inplace=True)
         wordDf.to_csv('words.csv', index=False)
+
 
 class DataProcessor:
     def __init__(self, dataset, device, tokenizers, emotionClassifiers, emotions):
@@ -386,7 +397,8 @@ def main():
     # Initialize DataProcessor and FileHandler
     emotions = []
     dataProcessor = DataProcessor(hf_dataset, device, tokenizers, emotionClassifiers, emotions)
-    fileHandler = FileHandler(hf_dataset, allStopwords, emotions)
+    fileHandler = FileHandler(hf_dataset, allStopwords, emotions, dataProcessor)
+
     fileHandler.dataProcessor = dataProcessor
 
     # Check and create files
