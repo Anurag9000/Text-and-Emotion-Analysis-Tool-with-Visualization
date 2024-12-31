@@ -47,22 +47,20 @@ class FileHandler:
 
         def addEmotions(dataset):
             def processBatch(batch):
-                emotionScores = dataProcessor.extractEmotions(batch)  # Extract emotions
-                emotionImpacts = {}
+                # Step 1: Extract averaged emotion scores
+                emotionScores = dataProcessor.extractEmotions(batch)
 
-                # Calculate impact for each emotion
-                for emotion, score in emotionScores.items():
-                    emotionImpacts[f"impact_{emotion}"] = [
-                        s * ((int(likes) // 10) + int(comments))
-                        for s, likes, comments in zip(score, batch['likes'], batch['comments'])
+                # Step 2: Add emotion scores to the batch
+                for emotion, avgScore in emotionScores.items():
+                    batch[emotion] = [avgScore] * len(batch['text'])  # Broadcast to match batch size
+
+                # Step 3: Calculate and add emotion impacts
+                for emotion, avgScore in emotionScores.items():
+                    impactKey = f"impact_{emotion}"
+                    batch[impactKey] = [
+                        avgScore * ((int(likes) // 10) + int(comments))
+                        for likes, comments in zip(batch['likes'], batch['comments'])
                     ]
-
-                # Add emotion scores and impacts to the batch
-                for emotion, score in emotionScores.items():
-                    batch[emotion] = score
-                for impactKey, impactValue in emotionImpacts.items():
-                    batch[impactKey] = impactValue
-
                 return batch
 
             try:
@@ -91,11 +89,15 @@ class FileHandler:
                     wordData[word]['comments'] += int(row['comments'])
                     wordData[word]['tone'] += float(sia.polarity_scores(word)['compound'])
                     wordData[word]['impact'] += wordData[word]['tone'] * (
-                            (int(row['likes']) // 10) + int(row['comments']))
+                        (int(row['likes']) // 10) + int(row['comments'])
+                    )
                     for emotion in self.emotions:
-                        wordData[word][f"emotion_{emotion}"] += float(row.get(f"emotion_{emotion}", 0))
-                        wordData[word][f"impact_{emotion}"] += float(row.get(f"emotion_{emotion}", 0)) * (
-                                (int(row['likes']) // 10) + int(row['comments']))
+                        emotionKey = f"emotion_{emotion}"
+                        impactKey = f"impact_{emotion}"
+                        wordData[word][emotionKey] += float(row.get(emotionKey, 0))
+                        wordData[word][impactKey] += float(row.get(emotionKey, 0)) * (
+                            (int(row['likes']) // 10) + int(row['comments'])
+                        )
 
         print("Creating 'words.csv'...")
         wordData = defaultdict(lambda: {
@@ -177,28 +179,35 @@ class DataProcessor:
         return {"frequency": frequencies}
 
     def extractEmotions(self, batch):
-        batchEmotionScores = defaultdict(list)
+        # Initialize an empty dictionary to hold emotion scores
+        emotionScores = {}
 
-        # Collect scores for each emotion from all models
-        for modelName in self.tokenizers.keys():
+        # Process outputs from each model
+        for modelName, tokenizer in self.tokenizers.items():
             try:
-                tokenizer = self.tokenizers[modelName]
                 classifier = self.emotionClassifiers[modelName]
                 inputs = tokenizer(batch['text'], truncation=True, padding=True, return_tensors="pt").to(self.device)
                 outputs = classifier(**inputs)
                 scores = torch.softmax(outputs.logits, dim=-1).detach().cpu().numpy()
                 labels = classifier.config.id2label
+
+                # Process each text in the batch
                 for score in scores:
                     for idx, emotion in labels.items():
-                        batchEmotionScores[emotion].append(score[idx])
+                        if emotion not in emotionScores:
+                            emotionScores[emotion] = [score[idx]]  # Initialize with a list
+                        else:
+                            emotionScores[emotion].append(score[idx])  # Append to existing list
             except Exception as e:
                 print(f"Error processing model: {modelName}. Error: {e}")
 
-        # Average scores across models for each emotion
-        averagedEmotionScores = {}
-        for emotion, scores in batchEmotionScores.items():
-            averagedEmotionScores[emotion] = sum(scores) / len(scores)  # Average
+        # Compute the average score for each emotion
+        averagedEmotionScores = {
+            emotion: sum(scores) / len(scores) for emotion, scores in emotionScores.items()
+        }
+
         return averagedEmotionScores
+
 
         batchEmotionScores = defaultdict(list)
         for modelName in self.tokenizers.keys():
