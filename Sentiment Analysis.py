@@ -27,7 +27,6 @@ def get_best_gpu():
 
     return best_gpu
 
-
 # Get all NLTK stopwords from all languages
 nltkLanguages = stopwords.fileids()
 nltkStopwords = set()
@@ -48,7 +47,7 @@ for lang in spacyLanguages:
         nlp = spacy.blank(lang)
         spacyStopwords.update(nlp.Defaults.stop_words)
     except Exception as e:
-        print(f"Error loading stopwords for language '{lang}': {e}")
+        print(f"Skipping stopwords for language '{lang}' due to error: {e}")
 
 # Combine all stopwords into a single set
 stopwords = nltkStopwords.union(spacyStopwords)
@@ -89,7 +88,10 @@ def calculate_tone_impact(batch):
     impacts = [tone * ((int(likes) // 10) + int(comments)) for tone, likes, comments in zip(tones, batch['likes'], batch['comments'])]
     return {"tone": tones, "impact": impacts}
 
-hf_dataset = hf_dataset.map(calculate_tone_impact, batched=True)
+try:
+    hf_dataset = hf_dataset.map(calculate_tone_impact, batched=True)
+except Exception as e:
+    print(f"Error mapping 'calculate_tone_impact': {e}")
 
 # Calculate frequency column
 def calculate_frequency(batch):
@@ -101,7 +103,10 @@ def calculate_frequency(batch):
     frequencies = [sum(word_frequency.get(word, 0) for word in text.split()) for text in batch['text']]
     return {"frequency": frequencies}
 
-hf_dataset = hf_dataset.map(calculate_frequency, batched=True)
+try:
+    hf_dataset = hf_dataset.map(calculate_frequency, batched=True)
+except Exception as e:
+    print(f"Error mapping 'calculate_frequency': {e}")
 
 # Analyze emotions for each text and add as columns
 emotions = ["joy", "sadness", "anger", "surprise", "fear"]
@@ -126,7 +131,10 @@ def extract_emotions(batch):
             print(f"Error processing model: {model_name}. Error: {e}")
     return batch_emotion_scores
 
-hf_dataset = hf_dataset.map(extract_emotions, batched=True, batch_size=64)
+try:
+    hf_dataset = hf_dataset.map(extract_emotions, batched=True)
+except Exception as e:
+    print(f"Error mapping 'extract_emotions': {e}")
 
 # Calculate impact for each emotion
 def calculate_impact_emotions(batch):
@@ -136,20 +144,26 @@ def calculate_impact_emotions(batch):
         emotion_impacts[f"impact_{emotion}"] = [float(emotion_score) * ((int(likes) // 10) + int(comments)) for emotion_score, likes, comments in zip(batch[emotion_column], batch['likes'], batch['comments'])]
     return emotion_impacts
 
-hf_dataset = hf_dataset.map(calculate_impact_emotions, batched=True)
+try:
+    hf_dataset = hf_dataset.map(calculate_impact_emotions, batched=True)
+except Exception as e:
+    print(f"Error mapping 'calculate_impact_emotions': {e}")
 
 # Check for existence of 'texts.csv' and 'words.csv'
 def check_and_create_files():
     texts_exists = os.path.exists('texts.csv')
     words_exists = os.path.exists('words.csv')
 
+try:
     if not texts_exists:
         print("'texts.csv' is missing. Generating...")
         create_texts_csv()
-
     if not words_exists:
         print("'words.csv' is missing. Generating...")
         create_words_csv()
+except Exception as e:
+    print(f"Error while creating files: {e}")
+
 
     if texts_exists or words_exists:
         regenerate = input("One or both files already exist. Do you want to regenerate them? (yes/no): ").strip().lower()
