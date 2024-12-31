@@ -15,370 +15,376 @@ nltk.download('stopwords')
 import torch
 from transformers import AutoTokenizer, XLMRobertaTokenizer
 import psutil
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+import re
+import pandas as pd
+from collections import defaultdict
+from nltk.sentiment import SentimentIntensityAnalyzer
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def get_best_gpu():
-    best_gpu = -1
-    max_free_memory = 0
+class FileHandler:
+    def __init__(self, dataset, stopwords, emotions):
+        self.dataset = dataset
+        self.stopwords = stopwords
+        self.emotions = emotions
 
-    for i in range(torch.cuda.device_count()):
-        free_memory = torch.cuda.get_device_properties(i).total_memory - torch.cuda.memory_reserved(i)
-        if free_memory > max_free_memory:
-            max_free_memory = free_memory
-            best_gpu = i
+    def createTextsCsv(self, calculateToneImpact, calculateFrequency, extractEmotions):
+        def addToneAndImpact(dataset):
+            try:
+                return dataset.map(calculateToneImpact, batched=True)
+            except Exception as e:
+                print(f"Error in 'addToneAndImpact': {e}")
+                return dataset
 
-    return best_gpu
+        def addFrequencies(dataset):
+            try:
+                return dataset.map(calculateFrequency, batched=True)
+            except Exception as e:
+                print(f"Error in 'addFrequencies': {e}")
+                return dataset
 
-# Function to dynamically calculate optimal batch size
-def calcOptimalBatchSize(dataset, mapFunction):
-    initialBatchSize = 10
-    maxBatchSize = 1000000000000  # Set a large value for maxBatchSize
-    optimalBatchSize = initialBatchSize
-    cpuThreshold = 98  # Maximum CPU usage percentage for optimization
+        def addEmotions(dataset):
+            try:
+                return dataset.map(extractEmotions, batched=True)
+            except Exception as e:
+                print(f"Error in 'addEmotions': {e}")
+                return dataset
 
-    for batchSize in range(initialBatchSize, maxBatchSize, 10):
-        try:
-            # Perform the mapping operation with the current batch size
-            dataset.map(mapFunction, batched=True, batch_size=batchSize)
-            
-            # Check current CPU usage
-            currentCpuUsage = psutil.cpu_percent(interval=1)
-            if currentCpuUsage > cpuThreshold:
-                break
+        print("Creating 'texts.csv'...")
+        dataset = self.dataset
+        dataset = addToneAndImpact(dataset)
+        dataset = addFrequencies(dataset)
+        dataset = addEmotions(dataset)
+        dataset.to_csv('texts.csv', index=False)
 
-            # Update optimal batch size if CPU usage is within the threshold
-            optimalBatchSize = batchSize
-        except Exception as e:
-            print(f"Error occurred with batch size {batchSize}: {e}")
-            break
-    return optimalBatchSize
+    def createWordsCsv(self):
+        sia = SentimentIntensityAnalyzer()
 
-# Get all NLTK stopwords from all languages
-nltkLanguages = stopwords.fileids()
-nltkStopwords = set()
-for lang in nltkLanguages:
-    nltkStopwords.update(stopwords.words(lang))
+        def processWords(wordData, row):
+            words = re.findall(r'\b\w+\b', row['text'].lower())
+            for word in words:
+                if word not in self.stopwords:
+                    wordData[word]['frequency'] += 1
+                    wordData[word]['likes'] += int(row['likes'])
+                    wordData[word]['comments'] += int(row['comments'])
+                    wordData[word]['tone'] += float(sia.polarity_scores(word)['compound'])
+                    wordData[word]['impact'] += wordData[word]['tone'] * (
+                            (int(row['likes']) // 10) + int(row['comments']))
+                    for emotion in self.emotions:
+                        wordData[word][f"emotion_{emotion}"] += float(row.get(f"emotion_{emotion}", 0))
+                        wordData[word][f"impact_{emotion}"] += float(row.get(f"emotion_{emotion}", 0)) * (
+                                (int(row['likes']) // 10) + int(row['comments']))
 
-# Load spaCy and get stopwords from all spaCy-supported languages
-spacyStopwords = set()
-spacyLanguages = [
-    "af", "ar", "bg", "bn", "ca", "cs", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "ga",
-    "gu", "he", "hi", "hr", "hu", "id", "is", "it", "kn", "lt", "lv", "mr", "nb", "nl",
-    "pl", "pt", "ro", "ru", "si", "sk", "sl", "sq", "sr", "sv", "ta", "te", "tl", "tr", "uk",
-    "ur", "zh"
-]
+        print("Creating 'words.csv'...")
+        wordData = defaultdict(lambda: {
+            'frequency': 0,
+            'likes': 0,
+            'comments': 0,
+            'tone': 0,
+            'impact': 0,
+            **{f"emotion_{emotion}": 0 for emotion in self.emotions},
+            **{f"impact_{emotion}": 0 for emotion in self.emotions}
+        })
+        for row in self.dataset:
+            try:
+                processWords(wordData, row)
+            except Exception as e:
+                print(f"Error processing row: {e}")
 
-for lang in spacyLanguages:
-    try:
-        nlp = spacy.blank(lang)
-        spacyStopwords.update(nlp.Defaults.stop_words)
-    except Exception as e:
-        print(f"Skipping stopwords for language '{lang}' due to error: {e}")
+        wordDf = pd.DataFrame.from_dict(wordData, orient='index').reset_index()
+        wordDf.rename(columns={"index": "word"}, inplace=True)
+        wordDf.to_csv('words.csv', index=False)
 
-# Combine all stopwords into a single set
-stopwords = nltkStopwords.union(spacyStopwords)
+class DataProcessor:
+    def __init__(self, dataset, device, tokenizers, emotionClassifiers, emotions):
+        self.dataset = dataset
+        self.device = device
+        self.tokenizers = tokenizers
+        self.emotionClassifiers = emotionClassifiers
+        self.emotions = emotions
 
-# Load the dataset using Dataset API
-hf_dataset = Dataset.from_csv('sentiment_dataset.csv')
+    @staticmethod
+    def getAllStopwords():
+        # Get all NLTK stopwords from all languages
+        nltkLanguages = stopwords.fileids()
+        nltkStopwords = set()
+        for lang in nltkLanguages:
+            nltkStopwords.update(stopwords.words(lang))
 
-# Initialize SentimentIntensityAnalyzer
-sia = SentimentIntensityAnalyzer()
-
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-
-models = [
-    "j-hartmann/emotion-English-distilroberta-base",
-    "bhadresh-savani/bert-base-go-emotion",
-    "monologg/bert-base-cased-goemotions-original",
-    "finiteautomata/bertweet-base-emotion-analysis",
-    "cardiffnlp/twitter-xlm-roberta-base-sentiment"
-]
-
-tokenizers = {}
-for model_name in models:
-    try:
-        if model_name == "cardiffnlp/twitter-xlm-roberta-base-sentiment":
-            tokenizers[model_name] = XLMRobertaTokenizer.from_pretrained(model_name)
-        else:
-            tokenizers[model_name] = AutoTokenizer.from_pretrained(model_name)
-        print(f"Successfully loaded tokenizer for model: {model_name}")
-    except Exception as e:
-        print(f"Failed to load tokenizer for model: {model_name}. Error: {e}")
-
-
-emotion_classifiers = {model_name: AutoModelForSequenceClassification.from_pretrained(model_name).to(device) for model_name in models}
-
-# Add "tone" and "impact" columns
-def calculate_tone_impact(batch):
-    tones = [sia.polarity_scores(text)['compound'] for text in batch['text']]
-    impacts = [tone * ((int(likes) // 10) + int(comments)) for tone, likes, comments in zip(tones, batch['likes'], batch['comments'])]
-    return {"tone": tones, "impact": impacts}
-
-try:
-    # batchSizeToneImpact = calcOptimalBatchSize(hf_dataset, calculate_tone_impact)
-    # print("Batch size for 'calculate_tone_impact':", batchSizeToneImpact)
-    hf_dataset = hf_dataset.map(calculate_tone_impact, batched=True)
-except Exception as e:
-    print(f"Error mapping 'calculate_tone_impact': {e}")
-
-# Calculate frequency column
-def calculate_frequency(batch):
-    word_frequency = defaultdict(int)
-    for text in batch['text']:
-        words = text.split()
-        for word in words:
-            word_frequency[word] += 1
-    frequencies = [sum(word_frequency.get(word, 0) for word in text.split()) for text in batch['text']]
-    return {"frequency": frequencies}
-
-try:
-    # batchSizeFrequency = calcOptimalBatchSize(hf_dataset, calculate_frequency)
-    # print("Batch size for 'calculate_frequency':", batchSizeFrequency)
-    hf_dataset = hf_dataset.map(calculate_frequency, batched=True)
-except Exception as e:
-    print(f"Error mapping 'calculate_frequency': {e}")
-
-# Analyze emotions for each text and add as columns
-emotions = []
-
-def extract_emotions(batch):
-    global emotions
-    print("extract emotions is running...")
-    batch_emotion_scores = defaultdict(list)
-    for model_name in models:
-        if model_name not in tokenizers:
-            print(f"Skipping model: {model_name} (Tokenizer not available)")
-            continue
-        try:
-            tokenizer = tokenizers[model_name]
-            classifier = emotion_classifiers[model_name]
-            inputs = tokenizer(batch['text'], truncation=True, padding=True, return_tensors="pt").to(device)
-            outputs = classifier(**inputs)
-            scores = torch.softmax(outputs.logits, dim=-1).detach().cpu().numpy()
-            labels = classifier.config.id2label
-            for score in scores:
-                for idx, emotion in labels.items():
-                    emotions.append(emotion)
-                    batch_emotion_scores[f"{model_name}_{emotion}"].append(score[idx])
-        except Exception as e:
-            print(f"Error processing model: {model_name}. Error: {e}")
-    return batch_emotion_scores
-
-try:
-    # batchSizeEmotions = calcOptimalBatchSize(hf_dataset, extract_emotions)
-    # print("Batch size for 'extract_emotions':", batchSizeEmotions)
-    hf_dataset = hf_dataset.map(extract_emotions, batched=True)
-except Exception as e:
-    print(f"Error mapping 'extract_emotions': {e}")
-
-# Calculate impact for each emotion
-def calculate_impact_emotions(batch):
-    emotion_impacts = {}
-    for emotion in emotions:
-        emotion_column = f"emotion_{emotion}"
-        if emotion_column not in batch:
-            print(f"Missing column: {emotion_column}. Assigning default values.")
-            emotion_impacts[f"impact_{emotion}"] = [0.0] * len(batch['text'])
-            continue
-        emotion_impacts[f"impact_{emotion}"] = [
-            float(emotion_score) * ((int(likes) // 10) + int(comments))
-            for emotion_score, likes, comments in zip(batch[emotion_column], batch['likes'], batch['comments'])
+        # Load spaCy and get stopwords from all spaCy-supported languages
+        spacyStopwords = set()
+        spacyLanguages = [
+            "af", "ar", "bg", "bn", "ca", "cs", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "ga",
+            "gu", "he", "hi", "hr", "hu", "id", "is", "it", "kn", "lt", "lv", "mr", "nb", "nl",
+            "pl", "pt", "ro", "ru", "si", "sk", "sl", "sq", "sr", "sv", "ta", "te", "tl", "tr", "uk",
+            "ur", "zh"
         ]
-    return emotion_impacts
+        for lang in spacyLanguages:
+            try:
+                nlp = spacy.blank(lang)
+                spacyStopwords.update(nlp.Defaults.stop_words)
+            except Exception as e:
+                print(f"Skipping stopwords for language '{lang}' due to error: {e}")
 
-try:
-    # batchSizeImpactEmotions = calcOptimalBatchSize(hf_dataset, calculate_impact_emotions)
-    # print("Batch size for 'calculate_impact_emotions':", batchSizeImpactEmotions)
-    hf_dataset = hf_dataset.map(calculate_impact_emotions, batched=True)
-except Exception as e:
-    print(f"Error mapping 'calculate_impact_emotions': {e}")
+        # Combine all stopwords into a single set
+        return nltkStopwords.union(spacyStopwords)
 
-# Check for existence of 'texts.csv' and 'words.csv'
-def check_and_create_files():
-    texts_exists = os.path.exists('texts.csv')
-    words_exists = os.path.exists('words.csv')
+    @staticmethod
+    def getBestGpu():
+        bestGpu = -1
+        maxFreeMemory = 0
+        for i in range(torch.cuda.device_count()):
+            freeMemory = torch.cuda.get_device_properties(i).total_memory - torch.cuda.memory_reserved(i)
+            if freeMemory > maxFreeMemory:
+                maxFreeMemory = freeMemory
+                bestGpu = i
+        return bestGpu
+
+    def calculateToneImpact(self, batch):
+        tones = [SentimentIntensityAnalyzer().polarity_scores(text)['compound'] for text in batch['text']]
+        impacts = [tone * ((int(likes) // 10) + int(comments)) for tone, likes, comments in zip(tones, batch['likes'], batch['comments'])]
+        return {"tone": tones, "impact": impacts}
+
+    def calculateFrequency(self, batch):
+        wordFrequency = defaultdict(int)
+        for text in batch['text']:
+            words = text.split()
+            for word in words:
+                wordFrequency[word] += 1
+        frequencies = [sum(wordFrequency.get(word, 0) for word in text.split()) for text in batch['text']]
+        return {"frequency": frequencies}
+
+    def extractEmotions(self, batch):
+        batchEmotionScores = defaultdict(list)
+        for modelName in self.tokenizers.keys():
+            try:
+                tokenizer = self.tokenizers[modelName]
+                classifier = self.emotionClassifiers[modelName]
+                inputs = tokenizer(batch['text'], truncation=True, padding=True, return_tensors="pt").to(self.device)
+                outputs = classifier(**inputs)
+                scores = torch.softmax(outputs.logits, dim=-1).detach().cpu().numpy()
+                labels = classifier.config.id2label
+                for score in scores:
+                    for idx, emotion in labels.items():
+                        self.emotions.append(emotion)
+                        batchEmotionScores[f"{modelName}_{emotion}"].append(score[idx])
+            except Exception as e:
+                print(f"Error processing model: {modelName}. Error: {e}")
+        return batchEmotionScores
+
+    def calculateImpactEmotions(self, batch):
+        emotionImpacts = {}
+        for emotion in self.emotions:
+            emotionColumn = f"emotion_{emotion}"
+            if emotionColumn not in batch:
+                print(f"Missing column: {emotionColumn}. Assigning default values.")
+                emotionImpacts[f"impact_{emotion}"] = [0.0] * len(batch['text'])
+                continue
+            emotionImpacts[f"impact_{emotion}"] = [
+                float(emotionScore) * ((int(likes) // 10) + int(comments))
+                for emotionScore, likes, comments in zip(batch[emotionColumn], batch['likes'], batch['comments'])
+            ]
+        return emotionImpacts
+
+class Visualizer:
+    def __init__(self, textsDf, wordsDf):
+        self.textsDf = textsDf
+        self.wordsDf = wordsDf
+
+    def groupAndSummarizeData(self, selection, sortBy):
+        if selection == 'words':
+            grouped = self.wordsDf.groupby('word', as_index=False).sum()
+            grouped = grouped[['word', sortBy]].sort_values(by=sortBy, ascending=False)
+        elif selection == 'texts':
+            grouped = self.textsDf.groupby('text', as_index=False).sum()
+            grouped = grouped[['text', sortBy]].sort_values(by=sortBy, ascending=False)
+        else:
+            grouped = self.textsDf.groupby(selection, as_index=False).sum()
+            grouped = grouped[[selection, sortBy]].sort_values(by=sortBy, ascending=False)
+        return grouped
+
+    def sliceData(self, df, threshold, countVal):
+        if threshold == 'Highest':
+            return df.head(countVal)
+        elif threshold == 'Lowest':
+            return df.tail(countVal)
+        elif threshold == 'Extremes':
+            halfN = countVal // 2
+            topN = halfN + (countVal % 2)
+            dfTop = df.head(topN)
+            dfBottom = df.tail(halfN)
+            return pd.concat([dfTop, dfBottom])
+        else:
+            return df.head(countVal)
+
+    def plotData(self, df, column, graphType, selection, sortBy, actualCount):
+        plt.figure(figsize=(10, 6))
+        if graphType == 'Bar':
+            plt.bar(df.iloc[:, 0].astype(str), df[column])
+        elif graphType == 'Line':
+            plt.plot(df.iloc[:, 0].astype(str), df[column], marker='o')
+        elif graphType == 'Pie':
+            plt.pie(df[column], labels=df.iloc[:, 0].astype(str), autopct='%1.1f%%')
+        plt.xticks(rotation=45, ha='right')
+        plotTitle = f"Top {actualCount} {selection} by {sortBy} ({column})"
+        plt.title(plotTitle)
+        if graphType != 'Pie':
+            plt.ylabel(column.capitalize())
+            plt.xlabel(selection.capitalize() if selection not in ['words', 'texts'] else selection.capitalize())
+        plt.tight_layout()
+        plt.show()
+
+class GUIHandler:
+    def __init__(self, visualizer):
+        self.visualizer = visualizer
+        self.selection = None
+        self.sortBy = None
+        self.threshold = None
+        self.countVal = None
+        self.graphType = None
+
+    def onSubmit(self, selectionVar, sortByVar, thresholdVar, countVar, graphTypeVar):
+        self.selection = selectionVar.get()
+        self.sortBy = sortByVar.get()
+        self.threshold = thresholdVar.get()
+        self.graphType = graphTypeVar.get()
+
+        try:
+            self.countVal = int(countVar.get())
+        except ValueError:
+            print("Invalid count value. Please enter a valid number.")
+            return
+
+        df = self.visualizer.groupAndSummarizeData(self.selection, self.sortBy)
+        if df is None or df.empty:
+            print("No data available for the given selection and sortBy.")
+            return
+
+        dfSliced = self.visualizer.sliceData(df, self.threshold, self.countVal)
+        actualCount = len(dfSliced)
+
+        if actualCount > 0:
+            self.visualizer.plotData(dfSliced, self.sortBy, self.graphType, self.selection, self.sortBy, actualCount)
+
+    
+def checkAndCreateFiles(fileHandler):
+    textsExists = os.path.exists('texts.csv')
+    wordsExists = os.path.exists('words.csv')
+
     try:
-        if not texts_exists:
+        if not textsExists:
             print("'texts.csv' is missing. Generating...")
-            create_texts_csv()
-        if not words_exists:
+            fileHandler.createTextsCsv(fileHandler.dataProcessor.calculateToneImpact,
+                                       fileHandler.dataProcessor.calculateFrequency,
+                                       fileHandler.dataProcessor.extractEmotions)
+        if not wordsExists:
             print("'words.csv' is missing. Generating...")
-            create_words_csv()
+            fileHandler.createWordsCsv()
     except Exception as e:
         print(f"Error while creating files: {e}")
 
-
-    if texts_exists or words_exists:
+    if textsExists or wordsExists:
         regenerate = input("One or both files already exist. Do you want to regenerate them? (yes/no): ").strip().lower()
-        if regenerate == 'yes':
-            if texts_exists:
-                create_texts_csv()
-            if words_exists:
-                create_words_csv()
+        if regenerate[0].lower() == 'y':
+            fileHandler.createTextsCsv(fileHandler.dataProcessor.calculateToneImpact,
+                                       fileHandler.dataProcessor.calculateFrequency,
+                                       fileHandler.dataProcessor.extractEmotions)
+            fileHandler.createWordsCsv()
 
-# Create 'texts.csv'
-def create_texts_csv():
-    print("Creating 'texts.csv'...")
-    hf_dataset.to_csv('texts.csv', index=False)
+def main():
+    # Load all stopwords using DataProcessor
+    allStopwords = DataProcessor.getAllStopwords()
 
-# Create 'words.csv'
-def create_words_csv():
-    print("Creating 'words.csv'...")
-    word_data = defaultdict(lambda: {
-        'frequency': 0,
-        'likes': 0,
-        'comments': 0,
-        'tone': 0,
-        'impact': 0,
-        **{f"emotion_{emotion}": 0 for emotion in emotions},
-        **{f"impact_{emotion}": 0 for emotion in emotions}
-    })
-
-    for row in hf_dataset:
-        words = re.findall(r'\b\w+\b', row['text'].lower())
-        for word in words:
-            if word not in stopwords:
-                word_data[word]['frequency'] += 1
-                word_data[word]['likes'] += int(row['likes'])
-                word_data[word]['comments'] += int(row['comments'])
-                word_data[word]['tone'] += float(sia.polarity_scores(word)['compound'])
-                word_data[word]['impact'] += word_data[word]['tone'] * ((int(row['likes']) // 10) + int(row['comments']))
-                for emotion in emotions:
-                    try :
-                        word_data[word][f"emotion_{emotion}"] += float(row[f"emotion_{emotion}"])
-                        word_data[word][f"impact_{emotion}"] += float(row[f"emotion_{emotion}"]) * ((int(row['likes']) // 10) + int(row['comments']))
-                    except:
-                        print(f"Error processing emotion: {emotion} for word: {word}")
-    word_df = pd.DataFrame.from_dict(word_data, orient='index').reset_index()
-    word_df.rename(columns={"index": "word"}, inplace=True)
-    word_df.to_csv('words.csv', index=False)
-
-# Execute file check
-check_and_create_files()
-
-# Load the main dataset and additional words dataset
-texts_df = hf_dataset.to_pandas()
-words_df = pd.read_csv('words.csv')
-
-# Initialize global variables for user input
-selection = None
-sort_by = None
-threshold = None
-count_val = None
-graph_type = None
-
-# Function to group and summarize data based on user selection
-def group_and_summarize_data(selection, sort_by):
-    if selection == 'words':
-        grouped = words_df.groupby('word', as_index=False).sum()
-        grouped = grouped[['word', sort_by]].sort_values(by=sort_by, ascending=False)
-    elif selection == 'texts':
-        grouped = texts_df.groupby('text', as_index=False).sum()
-        grouped = grouped[['text', sort_by]].sort_values(by=sort_by, ascending=False)
+    # Initialize GPU selection
+    bestGpu = DataProcessor.getBestGpu()
+    if bestGpu != -1:
+        device = torch.device(f"cuda:{bestGpu}")
+        print(f"Using GPU: {bestGpu}")
     else:
-        grouped = texts_df.groupby(selection, as_index=False).sum()
-        grouped = grouped[[selection, sort_by]].sort_values(by=sort_by, ascending=False)
-    return grouped
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"Using device: {device}")
 
-# Function to slice data based on threshold option
-def slice_data(df, threshold, count_val):
-    if threshold == 'Highest':
-        return df.head(count_val)
-    elif threshold == 'Lowest':
-        return df.tail(count_val)
-    elif threshold == 'Extremes':
-        half_n = count_val // 2
-        top_n = half_n + (count_val % 2)
-        df_top = df.head(top_n)
-        df_bottom = df.tail(half_n)
-        return pd.concat([df_top, df_bottom])
-    else:
-        return df.head(count_val)
+    # Load datasets
+    hf_dataset = Dataset.from_csv('sentiment_dataset.csv')
 
-# Function to plot the data based on user inputs
-def plot_data(df, column, actual_count):
-    plt.figure(figsize=(10, 6))
-    if graph_type == 'Bar':
-        plt.bar(df.iloc[:, 0].astype(str), df[column])
-    elif graph_type == 'Line':
-        plt.plot(df.iloc[:, 0].astype(str), df[column], marker='o')
-    elif graph_type == 'Pie':
-        plt.pie(df[column], labels=df.iloc[:, 0].astype(str), autopct='%1.1f%%')
-    plt.xticks(rotation=45, ha='right')
-    plot_title = f"Top {actual_count} {selection} by {sort_by} ({threshold})"
-    plt.title(plot_title)
-    if graph_type != 'Pie':
-        plt.ylabel(column.capitalize())
-        plt.xlabel(selection.capitalize() if selection not in ['words', 'texts'] else selection.capitalize())
-    plt.tight_layout()
-    plt.show()
+# Load tokenizers and models
+    models = [
+        "j-hartmann/emotion-English-distilroberta-base",
+        "bhadresh-savani/bert-base-go-emotion",
+        "monologg/bert-base-cased-goemotions-original",
+        "finiteautomata/bertweet-base-emotion-analysis",
+        "cardiffnlp/twitter-xlm-roberta-base-sentiment"
+    ]
 
-# Function to handle form submission and process data
-def on_submit():
-    global selection, sort_by, threshold, count_val, graph_type
-    selection = selection_var.get()
-    sort_by = sort_by_var.get()
-    threshold = threshold_var.get()
-    graph_type = graph_type_var.get()
+    tokenizers = {}
+    emotionClassifiers = {}
+    for modelName in models:
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(modelName)
+            if modelName == "cardiffnlp/twitter-xlm-roberta-base-sentiment":
+                tokenizers[modelName] = XLMRobertaTokenizer.from_pretrained(modelName)
+            else:
+            tokenizers[modelName] = tokenizer
+            classifier = AutoModelForSequenceClassification.from_pretrained(modelName).to(device)
+            emotionClassifiers[modelName] = classifier
+        except Exception as e:
+            print(f"Error loading model: {modelName}. Error: {e}")
 
-    try:
-        count_val = int(count_var.get())
-    except ValueError:
-        print("Invalid count value. Please enter a valid number.")
-        return
+    # Initialize DataProcessor and FileHandler
+    emotions = []
+    dataProcessor = DataProcessor(hf_dataset, device, tokenizers, emotionClassifiers, emotions)
+    fileHandler = FileHandler(hf_dataset, allStopwords, emotions)
+    fileHandler.dataProcessor = dataProcessor
 
-    df = group_and_summarize_data(selection, sort_by)
-    if df is None or df.empty:
-        print("No data available for the given selection and sort_by.")
-        return
+    # Check and create files
+    checkAndCreateFiles(fileHandler)
 
-    df_sliced = slice_data(df, threshold, count_val)
-    actual_count = len(df_sliced)
+    # Load dataframes for visualization
+    textsDf = hf_dataset.to_pandas()
+    wordsDf = pd.read_csv('words.csv')
 
-    if actual_count > 0:
-        plot_data(df_sliced, sort_by, actual_count)
+    # Initialize Visualizer and GUIHandler
+    visualizer = Visualizer(textsDf, wordsDf)
+    guiHandler = GUIHandler(visualizer)
 
-# Create the GUI using Tkinter
-root = tk.Tk()
-root.title("Data Selection")
-root.resizable(False, False)
+    # Launch GUI
+    root = tk.Tk()
+    root.title("Data Selection")
+    root.resizable(False, False)
 
-# User input fields for data type
-selection_var = tk.StringVar(value='texts')
-sort_by_var = tk.StringVar(value='impact')
-threshold_var = tk.StringVar(value='Highest')
-count_var = tk.StringVar(value='10')
-graph_type_var = tk.StringVar(value='Bar')
+    # User input fields for data type
+    selectionVar = tk.StringVar(value='texts')
+    sortByVar = tk.StringVar(value='impact')
+    thresholdVar = tk.StringVar(value='Highest')
+    countVar = tk.StringVar(value='10')
+    graphTypeVar = tk.StringVar(value='Bar')
 
-tk.Label(root, text="Select Data Type:").pack()
-data_type_menu = ttk.Combobox(root, textvariable=selection_var, values=['agegroup', 'country', 'texts', 'time', 'userid', 'words'], state="readonly")
-data_type_menu.pack()
+    tk.Label(root, text="Select Data Type:").pack()
+    dataTypeMenu = ttk.Combobox(root, textvariable=selectionVar, values=['agegroup', 'country', 'texts', 'time', 'userid', 'words'], state="readonly")
+    dataTypeMenu.pack()
 
-# User input fields for sorting criteria
-tk.Label(root, text="Sort By:").pack()
-sort_by_menu = ttk.Combobox(root, textvariable=sort_by_var, values=['impact', 'tone', 'likes', 'comments', 'frequency'] + [f'emotion_{e}' for e in emotions] + [f'impact_{e}' for e in emotions], state="readonly")
-sort_by_menu.pack()
+    tk.Label(root, text="Sort By:").pack()
+    sortByMenu = ttk.Combobox(root, textvariable=sortByVar, values=['impact', 'tone', 'likes', 'comments', 'frequency'], state="readonly")
+    sortByMenu.pack()
 
-# User input fields for threshold options
-tk.Label(root, text="Threshold:").pack()
-threshold_menu = ttk.Combobox(root, textvariable=threshold_var, values=['Highest', 'Lowest', 'Extremes'], state="readonly")
-threshold_menu.pack()
+    tk.Label(root, text="Threshold:").pack()
+    thresholdMenu = ttk.Combobox(root, textvariable=thresholdVar, values=['Highest', 'Lowest', 'Extremes'], state="readonly")
+    thresholdMenu.pack()
 
-# User input fields for count
-tk.Label(root, text="Number of Items to Display:").pack()
-count_entry = ttk.Entry(root, textvariable=count_var)
-count_entry.pack()
+    tk.Label(root, text="Number of Items to Display:").pack()
+    countEntry = ttk.Entry(root, textvariable=countVar)
+    countEntry.pack()
 
-# User input fields for graph type
-tk.Label(root, text="Select Graph Type:").pack()
-graph_type_menu = ttk.Combobox(root, textvariable=graph_type_var, values=['Bar', 'Line', 'Pie'], state="readonly")
-graph_type_menu.pack()
+    tk.Label(root, text="Select Graph Type:").pack()
+    graphTypeMenu = ttk.Combobox(root, textvariable=graphTypeVar, values=['Bar', 'Line', 'Pie'], state="readonly")
+    graphTypeMenu.pack()
 
-# Submit button
-tk.Button(root, text="Submit", command=on_submit).pack()
+    tk.Button(root, text="Submit", command=lambda: guiHandler.onSubmit(selectionVar, sortByVar, thresholdVar, countVar, graphTypeVar)).pack()
 
-# Run the GUI
-root.mainloop()
+    root.mainloop()
 
-print(emotions)
+# Entry point
+if __name__ == "__main__":
+    main()
