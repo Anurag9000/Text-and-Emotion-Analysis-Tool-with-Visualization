@@ -116,9 +116,9 @@ def calculate_tone_impact(batch):
     return {"tone": tones, "impact": impacts}
 
 try:
-    batchSizeToneImpact = calcOptimalBatchSize(hf_dataset, calculate_tone_impact)
-    print(batchSizeToneImpact)
-    hf_dataset = hf_dataset.map(calculate_tone_impact, batched=True, batch_size=batchSizeToneImpact)
+    # batchSizeToneImpact = calcOptimalBatchSize(hf_dataset, calculate_tone_impact)
+    # print("Batch size for 'calculate_tone_impact':", batchSizeToneImpact)
+    hf_dataset = hf_dataset.map(calculate_tone_impact, batched=True)
 except Exception as e:
     print(f"Error mapping 'calculate_tone_impact': {e}")
 
@@ -133,16 +133,18 @@ def calculate_frequency(batch):
     return {"frequency": frequencies}
 
 try:
-    batchSizeFrequency = calcOptimalBatchSize(hf_dataset, calculate_frequency)
-    hf_dataset = hf_dataset.map(calculate_frequency, batched=True, batch_size=batchSizeFrequency)
+    # batchSizeFrequency = calcOptimalBatchSize(hf_dataset, calculate_frequency)
+    # print("Batch size for 'calculate_frequency':", batchSizeFrequency)
+    hf_dataset = hf_dataset.map(calculate_frequency, batched=True)
 except Exception as e:
     print(f"Error mapping 'calculate_frequency': {e}")
 
 # Analyze emotions for each text and add as columns
-emotions = set()
+emotions = []
 
 def extract_emotions(batch):
     global emotions
+    print("extract emotions is running...")
     batch_emotion_scores = defaultdict(list)
     for model_name in models:
         if model_name not in tokenizers:
@@ -157,15 +159,16 @@ def extract_emotions(batch):
             labels = classifier.config.id2label
             for score in scores:
                 for idx, emotion in labels.items():
-                    emotions.add(emotion)
+                    emotions.append(emotion)
                     batch_emotion_scores[f"{model_name}_{emotion}"].append(score[idx])
         except Exception as e:
             print(f"Error processing model: {model_name}. Error: {e}")
     return batch_emotion_scores
 
 try:
-    batchSizeEmotions = calcOptimalBatchSize(hf_dataset, extract_emotions)
-    hf_dataset = hf_dataset.map(extract_emotions, batched=True, batch_size=batchSizeEmotions)
+    # batchSizeEmotions = calcOptimalBatchSize(hf_dataset, extract_emotions)
+    # print("Batch size for 'extract_emotions':", batchSizeEmotions)
+    hf_dataset = hf_dataset.map(extract_emotions, batched=True)
 except Exception as e:
     print(f"Error mapping 'extract_emotions': {e}")
 
@@ -174,12 +177,20 @@ def calculate_impact_emotions(batch):
     emotion_impacts = {}
     for emotion in emotions:
         emotion_column = f"emotion_{emotion}"
-        emotion_impacts[f"impact_{emotion}"] = [float(emotion_score) * ((int(likes) // 10) + int(comments)) for emotion_score, likes, comments in zip(batch[emotion_column], batch['likes'], batch['comments'])]
+        if emotion_column not in batch:
+            print(f"Missing column: {emotion_column}. Assigning default values.")
+            emotion_impacts[f"impact_{emotion}"] = [0.0] * len(batch['text'])
+            continue
+        emotion_impacts[f"impact_{emotion}"] = [
+            float(emotion_score) * ((int(likes) // 10) + int(comments))
+            for emotion_score, likes, comments in zip(batch[emotion_column], batch['likes'], batch['comments'])
+        ]
     return emotion_impacts
 
 try:
-    batchSizeImpactEmotions = calcOptimalBatchSize(hf_dataset, calculate_impact_emotions)
-    hf_dataset = hf_dataset.map(calculate_impact_emotions, batched=True, batch_size=batchSizeImpactEmotions)
+    # batchSizeImpactEmotions = calcOptimalBatchSize(hf_dataset, calculate_impact_emotions)
+    # print("Batch size for 'calculate_impact_emotions':", batchSizeImpactEmotions)
+    hf_dataset = hf_dataset.map(calculate_impact_emotions, batched=True)
 except Exception as e:
     print(f"Error mapping 'calculate_impact_emotions': {e}")
 
@@ -234,9 +245,11 @@ def create_words_csv():
                 word_data[word]['tone'] += float(sia.polarity_scores(word)['compound'])
                 word_data[word]['impact'] += word_data[word]['tone'] * ((int(row['likes']) // 10) + int(row['comments']))
                 for emotion in emotions:
-                    word_data[word][f"emotion_{emotion}"] += float(row[f"emotion_{emotion}"])
-                    word_data[word][f"impact_{emotion}"] += float(row[f"emotion_{emotion}"]) * ((int(row['likes']) // 10) + int(row['comments']))
-
+                    try :
+                        word_data[word][f"emotion_{emotion}"] += float(row[f"emotion_{emotion}"])
+                        word_data[word][f"impact_{emotion}"] += float(row[f"emotion_{emotion}"]) * ((int(row['likes']) // 10) + int(row['comments']))
+                    except:
+                        print(f"Error processing emotion: {emotion} for word: {word}")
     word_df = pd.DataFrame.from_dict(word_data, orient='index').reset_index()
     word_df.rename(columns={"index": "word"}, inplace=True)
     word_df.to_csv('words.csv', index=False)
@@ -367,3 +380,5 @@ tk.Button(root, text="Submit", command=on_submit).pack()
 
 # Run the GUI
 root.mainloop()
+
+print(emotions)
