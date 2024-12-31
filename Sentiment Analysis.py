@@ -13,6 +13,7 @@ import pandas as pd
 import os
 nltk.download('stopwords')
 import torch
+from transformers import AutoTokenizer, XLMRobertaTokenizer
 
 def get_best_gpu():
     best_gpu = -1
@@ -58,8 +59,29 @@ hf_dataset = Dataset.from_csv('sentiment_dataset.csv')
 # Initialize SentimentIntensityAnalyzer
 sia = SentimentIntensityAnalyzer()
 
-# Initialize Hugging Face emotion classification model
-emotion_classifier = pipeline("text-classification", model="j-hartmann/emotion-English-distilroberta-base", device=get_best_gpu())
+from transformers import AutoTokenizer, AutoModelForSequenceClassification
+
+models = [
+    "j-hartmann/emotion-English-distilroberta-base",
+    "bhadresh-savani/bert-base-go-emotion",
+    "monologg/bert-base-cased-goemotions-original",
+    "finiteautomata/bertweet-base-emotion-analysis",
+    "cardiffnlp/twitter-xlm-roberta-base-sentiment"
+]
+
+tokenizers = {}
+for model_name in models:
+    try:
+        if model_name == "cardiffnlp/twitter-xlm-roberta-base-sentiment":
+            tokenizers[model_name] = XLMRobertaTokenizer.from_pretrained(model_name)
+        else:
+            tokenizers[model_name] = AutoTokenizer.from_pretrained(model_name)
+        print(f"Successfully loaded tokenizer for model: {model_name}")
+    except Exception as e:
+        print(f"Failed to load tokenizer for model: {model_name}. Error: {e}")
+
+
+emotion_classifiers = {model_name: AutoModelForSequenceClassification.from_pretrained(model_name) for model_name in models}
 
 # Add "tone" and "impact" columns
 def calculate_tone_impact(batch):
@@ -85,25 +107,24 @@ hf_dataset = hf_dataset.map(calculate_frequency, batched=True)
 emotions = ["joy", "sadness", "anger", "surprise", "fear"]
 
 def extract_emotions(batch):
-    results = emotion_classifier(batch['text'], truncation=True)
-
-    batch_emotion_scores = []
-    for text_result in results:
-        # Check if text_result is a dictionary or list of dictionaries
-        if isinstance(text_result, dict):
-            # Process as a single result
-            emotion_scores = {emotion['label']: emotion['score'] for emotion in [text_result]}
-        elif isinstance(text_result, list):
-            # Process as a list of results
-            emotion_scores = {emotion['label']: emotion['score'] for emotion in text_result}
-        else:
-            raise TypeError(f"Unexpected structure for text_result: {type(text_result)}")
-
-        # Extract scores for the predefined emotions
-        batch_emotion_scores.append([emotion_scores.get(emotion, 0) for emotion in emotions])
-
-    # Aggregate scores into a dictionary
-    return {f"emotion_{emotion}": [float(scores[i]) for scores in batch_emotion_scores] for i, emotion in enumerate(emotions)}
+    batch_emotion_scores = defaultdict(list)
+    for model_name in models:
+        if model_name not in tokenizers:
+            print(f"Skipping model: {model_name} (Tokenizer not available)")
+            continue
+        try:
+            tokenizer = tokenizers[model_name]
+            classifier = emotion_classifiers[model_name]
+            inputs = tokenizer(batch['text'], truncation=True, padding=True, return_tensors="pt")
+            outputs = classifier(**inputs)
+            scores = torch.softmax(outputs.logits, dim=-1).detach().cpu().numpy()
+            labels = classifier.config.id2label
+            for score in scores:
+                for idx, emotion in labels.items():
+                    batch_emotion_scores[f"{model_name}_{emotion}"].append(score[idx])
+        except Exception as e:
+            print(f"Error processing model: {model_name}. Error: {e}")
+    return batch_emotion_scores
 
 hf_dataset = hf_dataset.map(extract_emotions, batched=True, batch_size=64)
 
