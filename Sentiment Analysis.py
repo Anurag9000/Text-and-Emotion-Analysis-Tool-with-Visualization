@@ -30,7 +30,7 @@ class FileHandler:
         self.stopwords = stopwords
         self.emotions = emotions
 
-    def createTextsCsv(self, calculateToneImpact, calculateFrequency, extractEmotions):
+    def createTextsCsv(self, calculateToneImpact, calculateFrequency, dataProcessor):
         def addToneAndImpact(dataset):
             try:
                 return dataset.map(calculateToneImpact, batched=True)
@@ -46,12 +46,32 @@ class FileHandler:
                 return dataset
 
         def addEmotions(dataset):
+            def processBatch(batch):
+                emotionScores = dataProcessor.extractEmotions(batch)  # Extract emotions
+                emotionImpacts = {}
+
+                # Calculate impact for each emotion
+                for emotion, score in emotionScores.items():
+                    emotionImpacts[f"impact_{emotion}"] = [
+                        s * ((int(likes) // 10) + int(comments))
+                        for s, likes, comments in zip(score, batch['likes'], batch['comments'])
+                    ]
+
+                # Add emotion scores and impacts to the batch
+                for emotion, score in emotionScores.items():
+                    batch[emotion] = score
+                for impactKey, impactValue in emotionImpacts.items():
+                    batch[impactKey] = impactValue
+
+                return batch
+
             try:
-                return dataset.map(extractEmotions, batched=True)
+                return dataset.map(processBatch, batched=True)
             except Exception as e:
                 print(f"Error in 'addEmotions': {e}")
                 return dataset
 
+        # Dataset processing
         print("Creating 'texts.csv'...")
         dataset = self.dataset
         dataset = addToneAndImpact(dataset)
@@ -157,6 +177,29 @@ class DataProcessor:
         return {"frequency": frequencies}
 
     def extractEmotions(self, batch):
+        batchEmotionScores = defaultdict(list)
+
+        # Collect scores for each emotion from all models
+        for modelName in self.tokenizers.keys():
+            try:
+                tokenizer = self.tokenizers[modelName]
+                classifier = self.emotionClassifiers[modelName]
+                inputs = tokenizer(batch['text'], truncation=True, padding=True, return_tensors="pt").to(self.device)
+                outputs = classifier(**inputs)
+                scores = torch.softmax(outputs.logits, dim=-1).detach().cpu().numpy()
+                labels = classifier.config.id2label
+                for score in scores:
+                    for idx, emotion in labels.items():
+                        batchEmotionScores[emotion].append(score[idx])
+            except Exception as e:
+                print(f"Error processing model: {modelName}. Error: {e}")
+
+        # Average scores across models for each emotion
+        averagedEmotionScores = {}
+        for emotion, scores in batchEmotionScores.items():
+            averagedEmotionScores[emotion] = sum(scores) / len(scores)  # Average
+        return averagedEmotionScores
+
         batchEmotionScores = defaultdict(list)
         for modelName in self.tokenizers.keys():
             try:
@@ -269,16 +312,16 @@ class GUIHandler:
             self.visualizer.plotData(dfSliced, self.sortBy, self.graphType, self.selection, self.sortBy, actualCount)
 
     
-def checkAndCreateFiles(fileHandler):
+def checkAndCreateFiles(fileHandler, dataProcessor):
     textsExists = os.path.exists('texts.csv')
     wordsExists = os.path.exists('words.csv')
 
     try:
         if not textsExists:
             print("'texts.csv' is missing. Generating...")
-            fileHandler.createTextsCsv(fileHandler.dataProcessor.calculateToneImpact,
-                                       fileHandler.dataProcessor.calculateFrequency,
-                                       fileHandler.dataProcessor.extractEmotions)
+            fileHandler.createTextsCsv(dataProcessor.calculateToneImpact,
+                                       dataProcessor.calculateFrequency,
+                                       dataProcessor)
         if not wordsExists:
             print("'words.csv' is missing. Generating...")
             fileHandler.createWordsCsv()
@@ -288,9 +331,9 @@ def checkAndCreateFiles(fileHandler):
     if textsExists or wordsExists:
         regenerate = input("One or both files already exist. Do you want to regenerate them? (yes/no): ").strip().lower()
         if regenerate[0].lower() == 'y':
-            fileHandler.createTextsCsv(fileHandler.dataProcessor.calculateToneImpact,
-                                       fileHandler.dataProcessor.calculateFrequency,
-                                       fileHandler.dataProcessor.extractEmotions)
+            fileHandler.createTextsCsv(dataProcessor.calculateToneImpact,
+                                       dataProcessor.calculateFrequency,
+                                       dataProcessor)
             fileHandler.createWordsCsv()
 
 def main():
@@ -315,7 +358,6 @@ def main():
         "bhadresh-savani/bert-base-go-emotion",
         "monologg/bert-base-cased-goemotions-original",
         "finiteautomata/bertweet-base-emotion-analysis",
-        "cardiffnlp/twitter-xlm-roberta-base-sentiment"
     ]
 
     tokenizers = {}
@@ -326,8 +368,8 @@ def main():
             if modelName == "cardiffnlp/twitter-xlm-roberta-base-sentiment":
                 tokenizers[modelName] = XLMRobertaTokenizer.from_pretrained(modelName)
             else:
-            tokenizers[modelName] = tokenizer
-            classifier = AutoModelForSequenceClassification.from_pretrained(modelName).to(device)
+                tokenizers[modelName] = tokenizer
+                classifier = AutoModelForSequenceClassification.from_pretrained(modelName).to(device)
             emotionClassifiers[modelName] = classifier
         except Exception as e:
             print(f"Error loading model: {modelName}. Error: {e}")
@@ -339,7 +381,7 @@ def main():
     fileHandler.dataProcessor = dataProcessor
 
     # Check and create files
-    checkAndCreateFiles(fileHandler)
+    checkAndCreateFiles(fileHandler, dataProcessor)
 
     # Load dataframes for visualization
     textsDf = hf_dataset.to_pandas()
@@ -385,6 +427,5 @@ def main():
 
     root.mainloop()
 
-# Entry point
 if __name__ == "__main__":
     main()
