@@ -133,10 +133,6 @@ class FileHandler:
         wordDf.rename(columns={"index": "word"}, inplace=True)
         wordDf.to_csv('tempwords.csv', index=False)
 
-from collections import defaultdict
-from transformers import pipeline
-import torch
-
 class DataProcessor:
     def __init__(self, dataset, device, apiModels, emotions):
         self.dataset = dataset
@@ -149,9 +145,6 @@ class DataProcessor:
 
     @staticmethod
     def getAllStopwords():
-        from nltk.corpus import stopwords
-        import spacy
-
         # Get all NLTK stopwords from all languages
         nltkLanguages = stopwords.fileids()
         nltkStopwords = set()
@@ -187,7 +180,6 @@ class DataProcessor:
         return bestGpu
 
     def calculateToneImpact(self, batch):
-        from nltk.sentiment import SentimentIntensityAnalyzer
         tones = [SentimentIntensityAnalyzer().polarity_scores(text)['compound'] for text in batch['text']]
         impacts = [
             tone * ((int(likes) // 10) + int(comments))
@@ -291,9 +283,6 @@ class Visualizer:
         plt.tight_layout()
         plt.show()
 
-import tkinter as tk
-from tkinter import ttk
-
 class GUIHandler:
     def __init__(self, visualizer):
         self.visualizer = visualizer
@@ -361,8 +350,6 @@ class GUIHandler:
 
         root.mainloop()
 
-import os
-
 def checkAndCreateFiles(fileHandler, dataProcessor):
     textsExists = os.path.exists('temptexts.csv')
     wordsExists = os.path.exists('tempwords.csv')
@@ -392,8 +379,6 @@ def checkAndCreateFiles(fileHandler, dataProcessor):
             fileHandler.createWordsCsv()
 
 def main():
-    from datasets import Dataset
-    import torch
 
     # Load all stopwords using DataProcessor
     allStopwords = DataProcessor.getAllStopwords()
