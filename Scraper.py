@@ -1,6 +1,7 @@
 import requests
 import json
 
+# Authentication
 def get_access_token(client_id, client_secret, user_agent):
     auth = requests.auth.HTTPBasicAuth(client_id, client_secret)
     headers = {"User-Agent": user_agent}
@@ -12,56 +13,42 @@ def get_access_token(client_id, client_secret, user_agent):
 
     return response.json()["access_token"]
 
-def scrape_reddit_subreddit(subreddit_url, headers, limit):
-    # Extract subreddit name from URL
-    subreddit_name = subreddit_url.rstrip('/').split('/')[-1]
+# Fetch subreddit posts
+def fetch_subreddit_posts(subreddit_name, headers, limit):
+    url = f"https://oauth.reddit.com/r/{subreddit_name}/new.json?limit={limit}"
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch subreddit posts: {response.status_code}")
 
-    # Fetch subreddit posts
-    posts_response = requests.get(f"https://oauth.reddit.com/r/{subreddit_name}/new.json?limit={limit}", headers=headers)
-    if posts_response.status_code != 200:
-        raise Exception(f"Failed to fetch subreddit posts: {posts_response.status_code}")
-
-    posts_data = posts_response.json()
+    posts_data = response.json()
     all_posts = []
 
     for post in posts_data['data']['children']:
+        # Skip bot-generated or empty posts
+        if not post['data'].get('title', '').strip() and not post['data'].get('selftext', '').strip():
+            continue
+
         post_details = {
             "title": post['data'].get('title', ''),
-            "content": post['data'].get('selftext', ''),
+            "body": post['data'].get('selftext', ''),
         }
 
-        # Fetch comments for each post
-        post_id = post['data']['id']
-        comments_response = requests.get(f"https://oauth.reddit.com/comments/{post_id}.json", headers=headers)
-        if comments_response.status_code == 200:
-            comments_data = comments_response.json()
-            comments = [
-                comment['data']['body'] for comment in comments_data[1]['data']['children'] if 'body' in comment['data']
-            ]
-        else:
-            comments = []
-
-        all_posts.append({"post_details": post_details, "comments": comments})
+        all_posts.append(post_details)
 
     return all_posts
 
-# Save data to a text file
-def save_to_text(subreddit_name, all_posts, file_name="subreddit_data.txt"):
+# Save to file
+def save_to_file(subreddit_name, posts, file_name):
     with open(file_name, "w", encoding="utf-8") as file:
         file.write(f"Subreddit: {subreddit_name}\n\n")
-        for idx, post in enumerate(all_posts):
+        for idx, post in enumerate(posts):
             file.write(f"Post {idx + 1}:\n")
-            file.write(f"Title: {post['post_details']['title']}\n")
-            file.write(f"Content: {post['post_details']['content']}\n\n")
-            file.write("Comments:\n")
-            for comment in post['comments']:
-                file.write(f"- {comment}\n")
-            file.write("\n\n")
-
+            file.write(f"Title: {post['title']}\n")
+            file.write(f"Body: {post['body']}\n\n")
     print(f"Data saved to {file_name}")
 
-if __name__ == "__main__":
-    # Take inputs from the user
+# Main script
+def main():
     subreddit_url = input("Enter the Reddit subreddit URL: ").strip()
     file_name = input("Enter the name of the output file (default: subreddit_data.txt): ").strip()
     if not file_name:
@@ -87,11 +74,12 @@ if __name__ == "__main__":
             "Authorization": f"Bearer {access_token}"
         }
 
-        # Scrape subreddit posts and comments
         subreddit_name = subreddit_url.rstrip('/').split('/')[-1]
-        all_posts = scrape_reddit_subreddit(subreddit_url, headers, limit)
+        posts = fetch_subreddit_posts(subreddit_name, headers, limit)
+        save_to_file(subreddit_name, posts, file_name)
 
-        # Save results to a text file
-        save_to_text(subreddit_name, all_posts, file_name)
     except Exception as e:
         print(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    main()
