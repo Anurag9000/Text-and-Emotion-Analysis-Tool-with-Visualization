@@ -246,11 +246,35 @@ class ComplexEmotionProcessor:
     def calculateComplexEmotions(self, row, filteredEmotions):
         complexEmotionScores = {}
         for complexEmotion, baseEmotions in filteredEmotions.items():
-            baseScores = [row.get(f"emotion_{base}", 0) for base in baseEmotions]
+            baseScores = []
+            for base in baseEmotions:
+                colName = f"emotion_{base}"  # Ensure the column name matches
+                if colName in row:
+                    baseScores.append(row[colName])
+                else:
+                    print(f"Missing column: {colName}")
+            # Calculate average if baseScores are available
             complexEmotionScores[f"emotion_{complexEmotion}"] = (
-                sum(baseScores) / len(baseEmotions) if baseScores and all(baseScores) else 0
+                sum(baseScores) / len(baseScores) if baseScores else 0
             )
         return complexEmotionScores
+
+    def addImpactColumns(self, df, complexEmotions):
+        for emotion in complexEmotions.keys():
+            colName = f"emotion_{emotion}"
+            impactColName = f"impact_{emotion}"
+
+            if colName in df.columns:
+                if impactColName in df.columns:
+                    print(f"Impact column {impactColName} already exists. Skipping calculation.")
+                    continue  # Avoid overwriting existing impact columns
+
+                df[impactColName] = df[colName] * (
+                    (df["likes"] // 10) + df["comments"]
+                )
+            else:
+                print(f"Missing complex emotion column for impact: {colName}")
+        return df
 
     def processWords(self):
         print("Processing complex emotions for words...")
@@ -261,30 +285,44 @@ class ComplexEmotionProcessor:
             lambda row: self.calculateComplexEmotions(row, self.filteredEmotions), axis=1
         )
 
-        # Convert the complex emotions into a DataFrame
+        # Convert complex emotions into a DataFrame
         complexEmotionDf = pd.DataFrame(complexEmotionScores.tolist())
 
-        # Concatenate with the original words DataFrame
+        # Drop columns from wordsDf if they already exist to prevent duplicates
+        overlappingCols = set(wordsDf.columns).intersection(set(complexEmotionDf.columns))
+        if overlappingCols:
+            print(f"Removing overlapping columns: {overlappingCols}")
+            wordsDf = wordsDf.drop(columns=overlappingCols)
+
+        # Concatenate with original DataFrame
         updatedWordsDf = pd.concat([wordsDf, complexEmotionDf], axis=1)
+
+        # Add impact columns for complex emotions
+        updatedWordsDf = self.addImpactColumns(updatedWordsDf, self.filteredEmotions)
 
         # Save the updated DataFrame
         updatedWordsDf.to_csv(self.outputWordsPath, index=False)
         print(f"Updated words saved to {self.outputWordsPath}")
 
+
     def processTexts(self):
         print("Processing complex emotions for texts...")
         textsDf = pd.read_csv(self.tempTextsPath)
+        print(f"Columns in texts file: {list(textsDf.columns)}")
 
         # Calculate complex emotions
         complexEmotionScores = textsDf.apply(
             lambda row: self.calculateComplexEmotions(row, self.filteredEmotions), axis=1
         )
 
-        # Convert the complex emotions into a DataFrame
+        # Convert complex emotions into a DataFrame
         complexEmotionDf = pd.DataFrame(complexEmotionScores.tolist())
 
-        # Concatenate with the original texts DataFrame
+        # Concatenate with original DataFrame
         updatedTextsDf = pd.concat([textsDf, complexEmotionDf], axis=1)
+
+        # Add impact columns for complex emotions
+        updatedTextsDf = self.addImpactColumns(updatedTextsDf, self.filteredEmotions)
 
         # Save the updated DataFrame
         updatedTextsDf.to_csv(self.outputTextsPath, index=False)
@@ -471,81 +509,71 @@ def main():
 
     # Define filtered_emotions dictionary
     filtered_emotions = {
-        "Compassion": ["Caring", "Sadness"],
-        "Elation": ["Joy", "Excitement"],
-        "Affection": ["Love", "Approval"],
-        "Admiration": ["Approval", "Respect"],
-        "Contentment": ["Relief", "Joy"],
-        "Playfulness": ["Amusement", "Joy"],
-        "Empathy": ["Caring", "Sadness"],
-        "Warmth": ["Love", "Caring"],
-        "Frustration": ["Annoyance", "Anger"],
-        "Shame": ["Embarrassment", "Disapproval"],
-        "Regret": ["Remorse", "Sadness"],
-        "Guilt": ["Remorse", "Grief"],
-        "Loneliness": ["Sadness", "Neutral"],
-        "Disdain": ["Disapproval", "Disgust"],
-        "Curiosity": ["Confusion", "Optimism"],
-        "Surprise": ["Fear", "Excitement"],
-        "Wonder": ["Curiosity", "Awe"],
-        "Awe": ["Fear", "Admiration"],
-        "Ambivalence": ["Positive", "Negative"],
-        "Skepticism": ["Confusion", "Realization"],
-        "Uncertainty": ["Confusion", "Neutral"],
-        "Triumph": ["Pride", "Joy"],
-        "Reluctance": ["Disapproval", "Desire"],
-        "Apathy": ["Neutral", "Sadness"],
-        "Nostalgia": ["Joy", "Sadness"],
-        "Intrigue": ["Curiosity", "Desire"],
-        "Hopefulness": ["Optimism", "Joy"],
-        "Trust": ["Approval", "Confidence"],
-        "Bliss": ["Joy", "Relief"],
-        "Fascination": ["Curiosity", "Admiration"],
-        "Passion": ["Love", "Desire"],
-        "Hopelessness": ["Sadness", "Disappointment"],
-        "Exasperation": ["Frustration", "Annoyance"],
-        "Bitterness": ["Sadness", "Anger"],
-        "Gratefulness": ["Gratitude", "Relief"],
-        "Encouragement": ["Optimism", "Support"],
-        "Agitation": ["Annoyance", "Nervousness"],
-        "Yearning": ["Desire", "Sadness"],
-        "Sorrow": ["Grief", "Sadness"],
-        "Delight": ["Joy", "Amusement"],
-        "Endearment": ["Love", "Affection"],
-        "Trepidation": ["Fear", "Anxiety", "Anticipation"],
-        "Amazement": ["Surprise", "Joy", "Admiration"],
-        "Complacency": ["Neutral", "Relief", "Approval"],
-        "Disillusionment": ["Sadness", "Disappointment", "Realization"],
-        "Zeal": ["Excitement", "Pride", "Desire"],
-        "Reverence": ["Admiration", "Gratitude", "Awe"],
-        "Infatuation": ["Love", "Desire", "Admiration"],
-        "Composure": ["Relief", "Neutral", "Caring"],
-        "Ecstasy": ["Joy", "Excitement", "Love"],
-        "Anticipation": ["Excitement", "Optimism", "Curiosity"],
-        "Resignation": ["Sadness", "Relief", "Acceptance"],
-        "Hostility": ["Anger", "Disgust", "Annoyance"],
-        "Disorientation": ["Confusion", "Fear", "Surprise"],
-        "Compunction": ["Remorse", "Sadness", "Grief"],
-        "Humility": ["Gratitude", "Relief", "Approval"],
-        "Serenity": ["Joy", "Relief", "Caring"],
-        "Reconciliation": ["Relief", "Love", "Gratitude"],
-        "Alienation": ["Sadness", "Disgust", "Disapproval"],
-        "Exultation": ["Pride", "Joy", "Excitement"],
-        "Affirmation": ["Approval", "Optimism", "Pride"],
-        "Serendipity": ["Joy", "Surprise", "Relief"],
-        "Acceptance": ["Relief", "Approval", "Caring"],
-        "Resentment": ["Sadness", "Anger", "Disapproval"],
-        "Cheerfulness": ["Joy", "Amusement", "Optimism"],
-        "Apprehension": ["Fear", "Nervousness", "Curiosity"],
-        "Eagerness": ["Excitement", "Hope", "Curiosity"],
-        "Clarity": ["Relief", "Realization", "Caring"],
-        "Hesitation": ["Fear", "Nervousness", "Confusion"],
-        "Fulfillment": ["Relief", "Love", "Satisfaction"],
-        "Grievance": ["Anger", "Sadness", "Disappointment"],
-        "Outrage": ["Anger", "Disapproval", "Disgust"],
-        "Pity": ["Sadness", "Caring", "Empathy"],
-        "Shock": ["Surprise", "Fear", "Disgust"],
-        "Satisfaction": ["Relief", "Joy", "Approval"]
+    "compassion": ["caring", "sadness"],
+    "elation": ["joy", "excitement"],
+    "affection": ["love", "approval"],
+    "contentment": ["relief", "joy"],
+    "playfulness": ["amusement", "joy"],
+    "empathy": ["caring", "sadness"],
+    "warmth": ["love", "caring"],
+    "frustration": ["annoyance", "anger"],
+    "shame": ["embarrassment", "disapproval"],
+    "regret": ["remorse", "sadness"],
+    "guilt": ["remorse", "grief"],
+    "loneliness": ["sadness", "neutral"],
+    "disdain": ["disapproval", "disgust"],
+    "curiosity": ["confusion", "optimism"],
+    "skepticism": ["confusion", "realization"],
+    "uncertainty": ["confusion", "neutral"],
+    "triumph": ["pride", "joy"],
+    "reluctance": ["disapproval", "desire"],
+    "apathy": ["neutral", "sadness"],
+    "nostalgia": ["joy", "sadness"],
+    "intrigue": ["curiosity", "desire"],
+    "hopefulness": ["optimism", "joy"],
+    "bliss": ["joy", "relief"],
+    "fascination": ["curiosity", "admiration"],
+    "passion": ["love", "desire"],
+    "hopelessness": ["sadness", "disappointment"],
+    "bitterness": ["sadness", "anger"],
+    "gratefulness": ["gratitude", "relief"],
+    "agitation": ["annoyance", "nervousness"],
+    "yearning": ["desire", "sadness"],
+    "sorrow": ["grief", "sadness"],
+    "delight": ["joy", "amusement"],
+    "trepidation": ["fear", "nervousness"],
+    "amazement": ["surprise", "joy", "admiration"],
+    "complacency": ["neutral", "relief", "approval"],
+    "disillusionment": ["sadness", "disappointment", "realization"],
+    "zeal": ["excitement", "pride", "desire"],
+    "reverence": ["admiration", "gratitude"],
+    "infatuation": ["love", "desire", "admiration"],
+    "composure": ["relief", "neutral", "caring"],
+    "ecstasy": ["joy", "excitement", "love"],
+    "anticipation": ["excitement", "optimism", "curiosity"],
+    "resignation": ["sadness", "relief"],
+    "hostility": ["anger", "disgust", "annoyance"],
+    "disorientation": ["confusion", "fear", "surprise"],
+    "compunction": ["remorse", "sadness", "grief"],
+    "humility": ["gratitude", "relief", "approval"],
+    "serenity": ["joy", "relief", "caring"],
+    "reconciliation": ["relief", "love", "gratitude"],
+    "alienation": ["sadness", "disgust", "disapproval"],
+    "exultation": ["pride", "joy", "excitement"],
+    "affirmation": ["approval", "optimism", "pride"],
+    "serendipity": ["joy", "surprise", "relief"],
+    "acceptance": ["relief", "approval", "caring"],
+    "resentment": ["sadness", "anger", "disapproval"],
+    "cheerfulness": ["joy", "amusement", "optimism"],
+    "apprehension": ["fear", "nervousness", "curiosity"],
+    "eagerness": ["excitement", "curiosity"],
+    "clarity": ["relief", "realization", "caring"],
+    "hesitation": ["fear", "nervousness", "confusion"],
+    "grievance": ["anger", "sadness", "disappointment"],
+    "outrage": ["anger", "disapproval", "disgust"],
+    "pity": ["sadness", "caring"],
+    "shock": ["surprise", "fear", "disgust"],
+    "satisfaction": ["relief", "joy", "approval"]
     }
 
 
