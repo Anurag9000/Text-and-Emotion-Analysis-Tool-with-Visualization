@@ -16,11 +16,6 @@ import torch
 from transformers import AutoTokenizer, XLMRobertaTokenizer
 import psutil
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
-import re
-import pandas as pd
-from collections import defaultdict
-from nltk.sentiment import SentimentIntensityAnalyzer
-
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -48,20 +43,30 @@ class FileHandler:
 
         def addEmotions(dataset):
             def processBatch(batch):
-                # Step 1: Extract averaged emotion scores
-                emotionScores = dataProcessor.extractEmotions(batch)
+                smallBatchSize = 16  # Reduce if API limitations exist
+                emotionScores = defaultdict(list)
 
-                # Step 2: Add emotion scores to the batch
-                for emotion, avgScore in emotionScores.items():
-                    batch[emotion] = [avgScore] * len(batch['text'])  # Broadcast to match batch size
+                for i in range(0, len(batch['text']), smallBatchSize):
+                    smallBatch = {"text": batch['text'][i:i + smallBatchSize]}
+                    try:
+                        smallBatchScores = dataProcessor.extractEmotions(smallBatch)
+                        for emotion, scores in smallBatchScores.items():
+                            emotionScores[emotion].extend(scores)
+                    except Exception as e:
+                        print(f"Error processing sub-batch: {e}")
 
-                # Step 3: Calculate and add emotion impacts
-                for emotion, avgScore in emotionScores.items():
+                for emotion, scores in emotionScores.items():
+                    if len(scores) < len(batch['text']):
+                        scores.extend([0] * (len(batch['text']) - len(scores)))
+                    batch[emotion] = scores
+
+                for emotion in emotionScores.keys():
                     impactKey = f"impact_{emotion}"
                     batch[impactKey] = [
-                        avgScore * ((int(likes) // 10) + int(comments))
-                        for likes, comments in zip(batch['likes'], batch['comments'])
+                        score * ((int(likes) // 10) + int(comments))
+                        for score, likes, comments in zip(batch[emotion], batch['likes'], batch['comments'])
                     ]
+
                 return batch
 
             try:
@@ -70,53 +75,52 @@ class FileHandler:
                 print(f"Error in 'addEmotions': {e}")
                 return dataset
 
-        # Dataset processing
-        print("Creating 'texts.csv'...")
+        print("Creating 'temptexts.csv'...")
         dataset = self.dataset
         dataset = addToneAndImpact(dataset)
         dataset = addFrequencies(dataset)
         dataset = addEmotions(dataset)
-        dataset.to_csv('texts.csv', index=False)
+        dataset.to_csv('temptexts.csv', index=False)
 
     def createWordsCsv(self):
         def processWords(wordData, row):
-            # Tokenize the text into individual words
             words = re.findall(r'\b\w+\b', row['text'].lower())
             for word in words:
-                # Run each word through the emotion models using self.dataProcessor
-                wordEmotionScores = self.dataProcessor.extractEmotions({"text": [word]})
+                try:
+                    wordEmotionScores = self.dataProcessor.extractEmotions({"text": [word]})
 
-                if word not in wordData:
-                    # Initialize data structure for the word if not already present
-                    wordData[word] = {
-                        'frequency': 0,
-                        'likes': 0,
-                        'comments': 0,
-                        'tone': 0,
-                        'impact': 0,
-                        **{f"emotion_{emotion}": 0 for emotion in wordEmotionScores.keys()},
-                        **{f"impact_{emotion}": 0 for emotion in wordEmotionScores.keys()},
-                    }
+                    if word not in wordData:
+                        wordData[word] = {
+                            'frequency': 0,
+                            'likes': 0,
+                            'comments': 0,
+                            'tone': 0,
+                            'impact': 0,
+                            **{f"emotion_{emotion}": 0 for emotion in wordEmotionScores.keys()},
+                            **{f"impact_{emotion}": 0 for emotion in wordEmotionScores.keys()},
+                        }
 
-                # Increment frequency and aggregate likes/comments
-                wordData[word]['frequency'] += 1
-                wordData[word]['likes'] += int(row['likes'])
-                wordData[word]['comments'] += int(row['comments'])
-
-                # Add tone and impact
-                wordData[word]['tone'] += float(SentimentIntensityAnalyzer().polarity_scores(word)['compound'])
-                wordData[word]['impact'] += wordData[word]['tone'] * (
-                    (int(row['likes']) // 10) + int(row['comments'])
-                )
-
-                # Add emotion scores and impacts
-                for emotion, score in wordEmotionScores.items():
-                    wordData[word][f"emotion_{emotion}"] += score
-                    wordData[word][f"impact_{emotion}"] += score * (
+                    wordData[word]['frequency'] += 1
+                    wordData[word]['likes'] += int(row['likes'])
+                    wordData[word]['comments'] += int(row['comments'])
+                    wordData[word]['tone'] += float(SentimentIntensityAnalyzer().polarity_scores(word)['compound'])
+                    wordData[word]['impact'] += wordData[word]['tone'] * (
                         (int(row['likes']) // 10) + int(row['comments'])
                     )
 
-        print("Creating 'words.csv'...")
+                    for emotion, score in wordEmotionScores.items():
+                        # Aggregate scores (e.g., take the first value if it's a list)
+                        score = score[0] if isinstance(score, list) else score
+                        wordData[word][f"emotion_{emotion}"] += score
+                        wordData[word][f"impact_{emotion}"] += score * (
+                            (int(row['likes']) // 10) + int(row['comments'])
+                        )
+
+                except Exception as e:
+                    print(f"Error processing word '{word}': {e}")
+
+
+        print("Creating 'tempwords.csv'...")
         wordData = {}
 
         for row in self.dataset:
@@ -127,19 +131,27 @@ class FileHandler:
 
         wordDf = pd.DataFrame.from_dict(wordData, orient='index').reset_index()
         wordDf.rename(columns={"index": "word"}, inplace=True)
-        wordDf.to_csv('words.csv', index=False)
+        wordDf.to_csv('tempwords.csv', index=False)
 
+from collections import defaultdict
+from transformers import pipeline
+import torch
 
 class DataProcessor:
-    def __init__(self, dataset, device, tokenizers, emotionClassifiers, emotions):
+    def __init__(self, dataset, device, apiModels, emotions):
         self.dataset = dataset
         self.device = device
-        self.tokenizers = tokenizers
-        self.emotionClassifiers = emotionClassifiers
+        self.apiPipelines = {
+            model: pipeline("text-classification", model=model, return_all_scores=True, device = DataProcessor.getBestGpu())
+            for model in apiModels
+        }
         self.emotions = emotions
 
     @staticmethod
     def getAllStopwords():
+        from nltk.corpus import stopwords
+        import spacy
+
         # Get all NLTK stopwords from all languages
         nltkLanguages = stopwords.fileids()
         nltkStopwords = set()
@@ -161,7 +173,6 @@ class DataProcessor:
             except Exception as e:
                 print(f"Skipping stopwords for language '{lang}' due to error: {e}")
 
-        # Combine all stopwords into a single set
         return nltkStopwords.union(spacyStopwords)
 
     @staticmethod
@@ -169,15 +180,19 @@ class DataProcessor:
         bestGpu = -1
         maxFreeMemory = 0
         for i in range(torch.cuda.device_count()):
-            freeMemory = torch.cuda.get_device_properties(i).total_memory - torch.cuda.memory_reserved(i)
+            freeMemory = torch.cuda.get_device_properties(i).total_memory - torch.cuda.memory_allocated(i)
             if freeMemory > maxFreeMemory:
                 maxFreeMemory = freeMemory
                 bestGpu = i
         return bestGpu
 
     def calculateToneImpact(self, batch):
+        from nltk.sentiment import SentimentIntensityAnalyzer
         tones = [SentimentIntensityAnalyzer().polarity_scores(text)['compound'] for text in batch['text']]
-        impacts = [tone * ((int(likes) // 10) + int(comments)) for tone, likes, comments in zip(tones, batch['likes'], batch['comments'])]
+        impacts = [
+            tone * ((int(likes) // 10) + int(comments))
+            for tone, likes, comments in zip(tones, batch['likes'], batch['comments'])
+        ]
         return {"tone": tones, "impact": impacts}
 
     def calculateFrequency(self, batch):
@@ -190,52 +205,29 @@ class DataProcessor:
         return {"frequency": frequencies}
 
     def extractEmotions(self, batch):
-        # Initialize an empty dictionary to hold emotion scores
-        emotionScores = {}
+        emotionScores = defaultdict(list)
 
-        # Process outputs from each model
-        for modelName, tokenizer in self.tokenizers.items():
+        for model, apiPipeline in self.apiPipelines.items():
             try:
-                classifier = self.emotionClassifiers[modelName]
-                inputs = tokenizer(batch['text'], truncation=True, padding=True, return_tensors="pt").to(self.device)
-                outputs = classifier(**inputs)
-                scores = torch.softmax(outputs.logits, dim=-1).detach().cpu().numpy()
-                labels = classifier.config.id2label
+                outputs = apiPipeline(batch['text'])
+                for textIndex, output in enumerate(outputs):
+                    for emotionData in output:
+                        label = emotionData['label']
+                        score = emotionData['score']
 
-                # Process each text in the batch
-                for score in scores:
-                    for idx, emotion in labels.items():
-                        if emotion not in emotionScores:
-                            emotionScores[emotion] = [score[idx]]  # Initialize with a list
-                        else:
-                            emotionScores[emotion].append(score[idx])  # Append to existing list
+                        if label not in emotionScores:
+                            emotionScores[label] = [0] * len(batch['text'])
+
+                        emotionScores[label][textIndex] += score
             except Exception as e:
-                print(f"Error processing model: {modelName}. Error: {e}")
+                print(f"Error processing with model {model}: {e}")
 
-        # Compute the average score for each emotion
         averagedEmotionScores = {
-            emotion: sum(scores) / len(scores) for emotion, scores in emotionScores.items()
+            emotion: [score / len(self.apiPipelines) for score in scores]
+            for emotion, scores in emotionScores.items()
         }
 
         return averagedEmotionScores
-
-
-        batchEmotionScores = defaultdict(list)
-        for modelName in self.tokenizers.keys():
-            try:
-                tokenizer = self.tokenizers[modelName]
-                classifier = self.emotionClassifiers[modelName]
-                inputs = tokenizer(batch['text'], truncation=True, padding=True, return_tensors="pt").to(self.device)
-                outputs = classifier(**inputs)
-                scores = torch.softmax(outputs.logits, dim=-1).detach().cpu().numpy()
-                labels = classifier.config.id2label
-                for score in scores:
-                    for idx, emotion in labels.items():
-                        self.emotions.append(emotion)
-                        batchEmotionScores[f"{modelName}_{emotion}"].append(score[idx])
-            except Exception as e:
-                print(f"Error processing model: {modelName}. Error: {e}")
-        return batchEmotionScores
 
     def calculateImpactEmotions(self, batch):
         emotionImpacts = {}
@@ -299,6 +291,9 @@ class Visualizer:
         plt.tight_layout()
         plt.show()
 
+import tkinter as tk
+from tkinter import ttk
+
 class GUIHandler:
     def __init__(self, visualizer):
         self.visualizer = visualizer
@@ -331,32 +326,75 @@ class GUIHandler:
         if actualCount > 0:
             self.visualizer.plotData(dfSliced, self.sortBy, self.graphType, self.selection, self.sortBy, actualCount)
 
-    
+    def launchGUI(self):
+        root = tk.Tk()
+        root.title("Data Selection")
+        root.resizable(False, False)
+
+        selectionVar = tk.StringVar(value='texts')
+        sortByVar = tk.StringVar(value='impact')
+        thresholdVar = tk.StringVar(value='Highest')
+        countVar = tk.StringVar(value='10')
+        graphTypeVar = tk.StringVar(value='Bar')
+
+        tk.Label(root, text="Select Data Type:").pack()
+        dataTypeMenu = ttk.Combobox(root, textvariable=selectionVar, values=['agegroup', 'country', 'texts', 'time', 'userid', 'words'], state="readonly")
+        dataTypeMenu.pack()
+
+        tk.Label(root, text="Sort By:").pack()
+        sortByMenu = ttk.Combobox(root, textvariable=sortByVar, values=['impact', 'tone', 'likes', 'comments', 'frequency'], state="readonly")
+        sortByMenu.pack()
+
+        tk.Label(root, text="Threshold:").pack()
+        thresholdMenu = ttk.Combobox(root, textvariable=thresholdVar, values=['Highest', 'Lowest', 'Extremes'], state="readonly")
+        thresholdMenu.pack()
+
+        tk.Label(root, text="Number of Items to Display:").pack()
+        countEntry = ttk.Entry(root, textvariable=countVar)
+        countEntry.pack()
+
+        tk.Label(root, text="Select Graph Type:").pack()
+        graphTypeMenu = ttk.Combobox(root, textvariable=graphTypeVar, values=['Bar', 'Line', 'Pie'], state="readonly")
+        graphTypeMenu.pack()
+
+        tk.Button(root, text="Submit", command=lambda: self.onSubmit(selectionVar, sortByVar, thresholdVar, countVar, graphTypeVar)).pack()
+
+        root.mainloop()
+
+import os
+
 def checkAndCreateFiles(fileHandler, dataProcessor):
-    textsExists = os.path.exists('texts.csv')
-    wordsExists = os.path.exists('words.csv')
+    textsExists = os.path.exists('temptexts.csv')
+    wordsExists = os.path.exists('tempwords.csv')
 
     try:
         if not textsExists:
-            print("'texts.csv' is missing. Generating...")
-            fileHandler.createTextsCsv(dataProcessor.calculateToneImpact,
-                                       dataProcessor.calculateFrequency,
-                                       dataProcessor)
+            print("'temptexts.csv' is missing. Generating...")
+            fileHandler.createTextsCsv(
+                dataProcessor.calculateToneImpact,
+                dataProcessor.calculateFrequency,
+                dataProcessor
+            )
         if not wordsExists:
-            print("'words.csv' is missing. Generating...")
+            print("'tempwords.csv' is missing. Generating...")
             fileHandler.createWordsCsv()
     except Exception as e:
         print(f"Error while creating files: {e}")
 
     if textsExists or wordsExists:
         regenerate = input("One or both files already exist. Do you want to regenerate them? (yes/no): ").strip().lower()
-        if regenerate[0].lower() == 'y':
-            fileHandler.createTextsCsv(dataProcessor.calculateToneImpact,
-                                       dataProcessor.calculateFrequency,
-                                       dataProcessor)
+        if regenerate.startswith('y'):
+            fileHandler.createTextsCsv(
+                dataProcessor.calculateToneImpact,
+                dataProcessor.calculateFrequency,
+                dataProcessor
+            )
             fileHandler.createWordsCsv()
 
 def main():
+    from datasets import Dataset
+    import torch
+
     # Load all stopwords using DataProcessor
     allStopwords = DataProcessor.getAllStopwords()
 
@@ -372,81 +410,32 @@ def main():
     # Load datasets
     hf_dataset = Dataset.from_csv('sentiment_dataset.csv')
 
-# Load tokenizers and models
-    models = [
+    # List of models for API pipelines
+    apiModels = [
         "j-hartmann/emotion-English-distilroberta-base",
         "bhadresh-savani/bert-base-go-emotion",
         "monologg/bert-base-cased-goemotions-original",
         "finiteautomata/bertweet-base-emotion-analysis",
     ]
 
-    tokenizers = {}
-    emotionClassifiers = {}
-    for modelName in models:
-        try:
-            tokenizer = AutoTokenizer.from_pretrained(modelName)
-            if modelName == "cardiffnlp/twitter-xlm-roberta-base-sentiment":
-                tokenizers[modelName] = XLMRobertaTokenizer.from_pretrained(modelName)
-            else:
-                tokenizers[modelName] = tokenizer
-                classifier = AutoModelForSequenceClassification.from_pretrained(modelName).to(device)
-            emotionClassifiers[modelName] = classifier
-        except Exception as e:
-            print(f"Error loading model: {modelName}. Error: {e}")
-
     # Initialize DataProcessor and FileHandler
     emotions = []
-    dataProcessor = DataProcessor(hf_dataset, device, tokenizers, emotionClassifiers, emotions)
+    dataProcessor = DataProcessor(hf_dataset, device, apiModels, emotions)
     fileHandler = FileHandler(hf_dataset, allStopwords, emotions, dataProcessor)
-
-    fileHandler.dataProcessor = dataProcessor
 
     # Check and create files
     checkAndCreateFiles(fileHandler, dataProcessor)
 
     # Load dataframes for visualization
     textsDf = hf_dataset.to_pandas()
-    wordsDf = pd.read_csv('words.csv')
+    wordsDf = pd.read_csv('tempwords.csv')
 
     # Initialize Visualizer and GUIHandler
     visualizer = Visualizer(textsDf, wordsDf)
     guiHandler = GUIHandler(visualizer)
 
     # Launch GUI
-    root = tk.Tk()
-    root.title("Data Selection")
-    root.resizable(False, False)
-
-    # User input fields for data type
-    selectionVar = tk.StringVar(value='texts')
-    sortByVar = tk.StringVar(value='impact')
-    thresholdVar = tk.StringVar(value='Highest')
-    countVar = tk.StringVar(value='10')
-    graphTypeVar = tk.StringVar(value='Bar')
-
-    tk.Label(root, text="Select Data Type:").pack()
-    dataTypeMenu = ttk.Combobox(root, textvariable=selectionVar, values=['agegroup', 'country', 'texts', 'time', 'userid', 'words'], state="readonly")
-    dataTypeMenu.pack()
-
-    tk.Label(root, text="Sort By:").pack()
-    sortByMenu = ttk.Combobox(root, textvariable=sortByVar, values=['impact', 'tone', 'likes', 'comments', 'frequency'], state="readonly")
-    sortByMenu.pack()
-
-    tk.Label(root, text="Threshold:").pack()
-    thresholdMenu = ttk.Combobox(root, textvariable=thresholdVar, values=['Highest', 'Lowest', 'Extremes'], state="readonly")
-    thresholdMenu.pack()
-
-    tk.Label(root, text="Number of Items to Display:").pack()
-    countEntry = ttk.Entry(root, textvariable=countVar)
-    countEntry.pack()
-
-    tk.Label(root, text="Select Graph Type:").pack()
-    graphTypeMenu = ttk.Combobox(root, textvariable=graphTypeVar, values=['Bar', 'Line', 'Pie'], state="readonly")
-    graphTypeMenu.pack()
-
-    tk.Button(root, text="Submit", command=lambda: guiHandler.onSubmit(selectionVar, sortByVar, thresholdVar, countVar, graphTypeVar)).pack()
-
-    root.mainloop()
+    guiHandler.launchGUI()
 
 if __name__ == "__main__":
     main()
