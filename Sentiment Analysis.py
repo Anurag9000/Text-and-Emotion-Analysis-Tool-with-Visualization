@@ -26,60 +26,44 @@ class FileHandler:
         self.emotions = emotions
         self.dataProcessor = dataProcessor  # Store the dataProcessor instance
 
+    def addEmotions(self, dataset):
+        def processBatch(batch):
+            smallBatchSize = 16
+            emotionScores = defaultdict(list)
+
+            for i in range(0, len(batch['text']), smallBatchSize):
+                smallBatch = {"text": batch['text'][i:i + smallBatchSize]}
+                try:
+                    smallBatchScores = self.dataProcessor.extractEmotions(smallBatch)
+                    for emotion, scores in smallBatchScores.items():
+                        emotionScores[emotion].extend(scores)
+                except Exception as e:
+                    print(f"Error processing sub-batch: {e}")
+
+            for emotion, scores in emotionScores.items():
+                if len(scores) < len(batch['text']):
+                    scores.extend([0] * (len(batch['text']) - len(scores)))
+                batch[emotion] = scores
+
+            for emotion in emotionScores.keys():
+                impactKey = f"impact_{emotion}"
+                batch[impactKey] = [
+                    score * ((int(likes) // 10) + int(comments))
+                    for score, likes, comments in zip(batch[emotion], batch['likes'], batch['comments'])
+                ]
+
+            return batch
+
+        try:
+            return dataset.map(processBatch, batched=True)
+        except Exception as e:
+            print(f"Error in 'addEmotions': {e}")
+            return dataset
+
     def createTextsCsv(self, calculateToneImpact, calculateFrequency, dataProcessor):
-        def addToneAndImpact(dataset):
-            try:
-                return dataset.map(calculateToneImpact, batched=True)
-            except Exception as e:
-                print(f"Error in 'addToneAndImpact': {e}")
-                return dataset
-
-        def addFrequencies(dataset):
-            try:
-                return dataset.map(calculateFrequency, batched=True)
-            except Exception as e:
-                print(f"Error in 'addFrequencies': {e}")
-                return dataset
-
-        def addEmotions(dataset):
-            def processBatch(batch):
-                smallBatchSize = 16  # Reduce if API limitations exist
-                emotionScores = defaultdict(list)
-
-                for i in range(0, len(batch['text']), smallBatchSize):
-                    smallBatch = {"text": batch['text'][i:i + smallBatchSize]}
-                    try:
-                        smallBatchScores = dataProcessor.extractEmotions(smallBatch)
-                        for emotion, scores in smallBatchScores.items():
-                            emotionScores[emotion].extend(scores)
-                    except Exception as e:
-                        print(f"Error processing sub-batch: {e}")
-
-                for emotion, scores in emotionScores.items():
-                    if len(scores) < len(batch['text']):
-                        scores.extend([0] * (len(batch['text']) - len(scores)))
-                    batch[emotion] = scores
-
-                for emotion in emotionScores.keys():
-                    impactKey = f"impact_{emotion}"
-                    batch[impactKey] = [
-                        score * ((int(likes) // 10) + int(comments))
-                        for score, likes, comments in zip(batch[emotion], batch['likes'], batch['comments'])
-                    ]
-
-                return batch
-
-            try:
-                return dataset.map(processBatch, batched=True)
-            except Exception as e:
-                print(f"Error in 'addEmotions': {e}")
-                return dataset
-
         print("Creating 'temptexts.csv'...")
         dataset = self.dataset
-        dataset = addToneAndImpact(dataset)
-        dataset = addFrequencies(dataset)
-        dataset = addEmotions(dataset)
+        dataset = self.addEmotions(dataset)
         dataset.to_csv('temptexts.csv', index=False)
 
     def createWordsCsv(self):
@@ -109,7 +93,6 @@ class FileHandler:
                     )
 
                     for emotion, score in wordEmotionScores.items():
-                        # Aggregate scores (e.g., take the first value if it's a list)
                         score = score[0] if isinstance(score, list) else score
                         wordData[word][f"emotion_{emotion}"] += score
                         wordData[word][f"impact_{emotion}"] += score * (
@@ -118,7 +101,6 @@ class FileHandler:
 
                 except Exception as e:
                     print(f"Error processing word '{word}': {e}")
-
 
         print("Creating 'tempwords.csv'...")
         wordData = {}
@@ -138,63 +120,87 @@ class DataProcessor:
         self.dataset = dataset
         self.device = device
         self.apiPipelines = {
-            model: pipeline("text-classification", model=model, return_all_scores=True, device = DataProcessor.getBestGpu())
+            model: pipeline("text-classification", model=model, return_all_scores=True, device=DataProcessor.getBestGpu())
             for model in apiModels
         }
         self.emotions = emotions
-
-    @staticmethod
-    def getAllStopwords():
-        # Get all NLTK stopwords from all languages
-        nltkLanguages = stopwords.fileids()
-        nltkStopwords = set()
-        for lang in nltkLanguages:
-            nltkStopwords.update(stopwords.words(lang))
-
-        # Load spaCy and get stopwords from all spaCy-supported languages
-        spacyStopwords = set()
-        spacyLanguages = [
-            "af", "ar", "bg", "bn", "ca", "cs", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "ga",
-            "gu", "he", "hi", "hr", "hu", "id", "is", "it", "kn", "lt", "lv", "mr", "nb", "nl",
-            "pl", "pt", "ro", "ru", "si", "sk", "sl", "sq", "sr", "sv", "ta", "te", "tl", "tr", "uk",
-            "ur", "zh"
-        ]
-        for lang in spacyLanguages:
-            try:
-                nlp = spacy.blank(lang)
-                spacyStopwords.update(nlp.Defaults.stop_words)
-            except Exception as e:
-                print(f"Skipping stopwords for language '{lang}' due to error: {e}")
-
-        return nltkStopwords.union(spacyStopwords)
-
-    @staticmethod
-    def getBestGpu():
-        bestGpu = -1
-        maxFreeMemory = 0
-        for i in range(torch.cuda.device_count()):
-            freeMemory = torch.cuda.get_device_properties(i).total_memory - torch.cuda.memory_allocated(i)
-            if freeMemory > maxFreeMemory:
-                maxFreeMemory = freeMemory
-                bestGpu = i
-        return bestGpu
-
-    def calculateToneImpact(self, batch):
-        tones = [SentimentIntensityAnalyzer().polarity_scores(text)['compound'] for text in batch['text']]
-        impacts = [
-            tone * ((int(likes) // 10) + int(comments))
-            for tone, likes, comments in zip(tones, batch['likes'], batch['comments'])
-        ]
-        return {"tone": tones, "impact": impacts}
-
-    def calculateFrequency(self, batch):
-        wordFrequency = defaultdict(int)
-        for text in batch['text']:
-            words = text.split()
-            for word in words:
-                wordFrequency[word] += 1
-        frequencies = [sum(wordFrequency.get(word, 0) for word in text.split()) for text in batch['text']]
-        return {"frequency": frequencies}
+        self.filteredEmotions = {
+    "Compassion": ["Caring", "Sadness"],
+    "Elation": ["Joy", "Excitement"],
+    "Affection": ["Love", "Approval"],
+    "Admiration": ["Approval", "Respect"],
+    "Contentment": ["Relief", "Joy"],
+    "Playfulness": ["Amusement", "Joy"],
+    "Empathy": ["Caring", "Sadness"],
+    "Warmth": ["Love", "Caring"],
+    "Frustration": ["Annoyance", "Anger"],
+    "Shame": ["Embarrassment", "Disapproval"],
+    "Regret": ["Remorse", "Sadness"],
+    "Guilt": ["Remorse", "Grief"],
+    "Loneliness": ["Sadness", "Neutral"],
+    "Disdain": ["Disapproval", "Disgust"],
+    "Curiosity": ["Confusion", "Optimism"],
+    "Surprise": ["Fear", "Excitement"],
+    "Wonder": ["Curiosity", "Awe"],
+    "Awe": ["Fear", "Admiration"],
+    "Ambivalence": ["Positive", "Negative"],
+    "Skepticism": ["Confusion", "Realization"],
+    "Uncertainty": ["Confusion", "Neutral"],
+    "Triumph": ["Pride", "Joy"],
+    "Reluctance": ["Disapproval", "Desire"],
+    "Apathy": ["Neutral", "Sadness"],
+    "Nostalgia": ["Joy", "Sadness"],
+    "Intrigue": ["Curiosity", "Desire"],
+    "Hopefulness": ["Optimism", "Joy"],
+    "Trust": ["Approval", "Confidence"],
+    "Bliss": ["Joy", "Relief"],
+    "Fascination": ["Curiosity", "Admiration"],
+    "Passion": ["Love", "Desire"],
+    "Hopelessness": ["Sadness", "Disappointment"],
+    "Exasperation": ["Frustration", "Annoyance"],
+    "Bitterness": ["Sadness", "Anger"],
+    "Gratefulness": ["Gratitude", "Relief"],
+    "Encouragement": ["Optimism", "Support"],
+    "Agitation": ["Annoyance", "Nervousness"],
+    "Yearning": ["Desire", "Sadness"],
+    "Sorrow": ["Grief", "Sadness"],
+    "Delight": ["Joy", "Amusement"],
+    "Endearment": ["Love", "Affection"],
+    "Trepidation": ["Fear", "Anxiety", "Anticipation"],
+    "Amazement": ["Surprise", "Joy", "Admiration"],
+    "Complacency": ["Neutral", "Relief", "Approval"],
+    "Disillusionment": ["Sadness", "Disappointment", "Realization"],
+    "Zeal": ["Excitement", "Pride", "Desire"],
+    "Reverence": ["Admiration", "Gratitude", "Awe"],
+    "Infatuation": ["Love", "Desire", "Admiration"],
+    "Composure": ["Relief", "Neutral", "Caring"],
+    "Ecstasy": ["Joy", "Excitement", "Love"],
+    "Anticipation": ["Excitement", "Optimism", "Curiosity"],
+    "Resignation": ["Sadness", "Relief", "Acceptance"],
+    "Hostility": ["Anger", "Disgust", "Annoyance"],
+    "Disorientation": ["Confusion", "Fear", "Surprise"],
+    "Compunction": ["Remorse", "Sadness", "Grief"],
+    "Humility": ["Gratitude", "Relief", "Approval"],
+    "Serenity": ["Joy", "Relief", "Caring"],
+    "Reconciliation": ["Relief", "Love", "Gratitude"],
+    "Alienation": ["Sadness", "Disgust", "Disapproval"],
+    "Exultation": ["Pride", "Joy", "Excitement"],
+    "Affirmation": ["Approval", "Optimism", "Pride"],
+    "Serendipity": ["Joy", "Surprise", "Relief"],
+    "Acceptance": ["Relief", "Approval", "Caring"],
+    "Resentment": ["Sadness", "Anger", "Disapproval"],
+    "Cheerfulness": ["Joy", "Amusement", "Optimism"],
+    "Apprehension": ["Fear", "Nervousness", "Curiosity"],
+    "Eagerness": ["Excitement", "Hope", "Curiosity"],
+    "Clarity": ["Relief", "Realization", "Caring"],
+    "Hesitation": ["Fear", "Nervousness", "Confusion"],
+    "Fulfillment": ["Relief", "Love", "Satisfaction"],
+    "Grievance": ["Anger", "Sadness", "Disappointment"],
+    "Outrage": ["Anger", "Disapproval", "Disgust"],
+    "Pity": ["Sadness", "Caring", "Empathy"],
+    "Shock": ["Surprise", "Fear", "Disgust"],
+    "Satisfaction": ["Relief", "Joy", "Approval"]
+        }
 
     def extractEmotions(self, batch):
         emotionScores = defaultdict(list)
@@ -219,7 +225,36 @@ class DataProcessor:
             for emotion, scores in emotionScores.items()
         }
 
+        filteredEmotionScores = self.calcFilteredEmotions(averagedEmotionScores, len(batch['text']))
+        averagedEmotionScores.update(filteredEmotionScores)
         return averagedEmotionScores
+
+    def calcFilteredEmotions(self, emotionScores, batchSize):
+        filteredEmotionScores = {}
+        for filteredEmotion, comprisingEmotions in self.filteredEmotions.items():
+            scores = [
+                sum(emotionScores.get(emotion, [0] * batchSize)[i] for emotion in comprisingEmotions) / len(comprisingEmotions)
+                for i in range(batchSize)
+            ]
+            filteredEmotionScores[filteredEmotion] = scores
+        return filteredEmotionScores
+
+    def calculateToneImpact(self, batch):
+        tones = [SentimentIntensityAnalyzer().polarity_scores(text)['compound'] for text in batch['text']]
+        impacts = [
+            tone * ((int(likes) // 10) + int(comments))
+            for tone, likes, comments in zip(tones, batch['likes'], batch['comments'])
+        ]
+        return {"tone": tones, "impact": impacts}
+
+    def calculateFrequency(self, batch):
+        wordFrequency = defaultdict(int)
+        for text in batch['text']:
+            words = text.split()
+            for word in words:
+                wordFrequency[word] += 1
+        frequencies = [sum(wordFrequency.get(word, 0) for word in text.split()) for text in batch['text']]
+        return {"frequency": frequencies}
 
     def calculateImpactEmotions(self, batch):
         emotionImpacts = {}
@@ -234,6 +269,41 @@ class DataProcessor:
                 for emotionScore, likes, comments in zip(batch[emotionColumn], batch['likes'], batch['comments'])
             ]
         return emotionImpacts
+
+    @staticmethod
+    def getBestGpu():
+        bestGpu = -1
+        maxFreeMemory = 0
+        for i in range(torch.cuda.device_count()):
+            freeMemory = torch.cuda.get_device_properties(i).total_memory - torch.cuda.memory_allocated(i)
+            if freeMemory > maxFreeMemory:
+                maxFreeMemory = freeMemory
+                bestGpu = i
+        return bestGpu
+
+    @staticmethod
+    def getAllStopwords():
+        nltkLanguages = stopwords.fileids()
+        nltkStopwords = set()
+        for lang in nltkLanguages:
+            nltkStopwords.update(stopwords.words(lang))
+
+        spacyStopwords = set()
+        spacyLanguages = [
+            "af", "ar", "bg", "bn", "ca", "cs", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "ga",
+            "gu", "he", "hi", "hr", "hu", "id", "is", "it", "kn", "lt", "lv", "mr", "nb", "nl",
+            "pl", "pt", "ro", "ru", "si", "sk", "sl", "sq", "sr", "sv", "ta", "te", "tl", "tr", "uk",
+            "ur", "zh"
+        ]
+        for lang in spacyLanguages:
+            try:
+                nlp = spacy.blank(lang)
+                spacyStopwords.update(nlp.Defaults.stop_words)
+            except Exception as e:
+                print(f"Skipping stopwords for language '{lang}' due to error: {e}")
+
+        return nltkStopwords.union(spacyStopwords)
+
 
 class Visualizer:
     def __init__(self, textsDf, wordsDf):
