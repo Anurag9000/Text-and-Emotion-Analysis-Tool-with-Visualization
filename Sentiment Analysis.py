@@ -248,7 +248,8 @@ class ComplexEmotionProcessor:
         for complexEmotion, baseEmotions in filteredEmotions.items():
             baseScores = []
             for base in baseEmotions:
-                colName = f"emotion_{base}"  # Ensure the column name matches
+                # Handle non-prefixed columns (temptexts) and prefixed columns (tempwords)
+                colName = f"emotion_{base}" if f"emotion_{base}" in row.index else base
                 if colName in row:
                     baseScores.append(row[colName])
                 else:
@@ -261,13 +262,13 @@ class ComplexEmotionProcessor:
 
     def addImpactColumns(self, df, complexEmotions):
         for emotion in complexEmotions.keys():
-            colName = f"emotion_{emotion}"
+            colName = f"emotion_{emotion}" if f"emotion_{emotion}" in df.columns else emotion
             impactColName = f"impact_{emotion}"
 
             if colName in df.columns:
                 if impactColName in df.columns:
                     print(f"Impact column {impactColName} already exists. Skipping calculation.")
-                    continue  # Avoid overwriting existing impact columns
+                    continue
 
                 df[impactColName] = df[colName] * (
                     (df["likes"] // 10) + df["comments"]
