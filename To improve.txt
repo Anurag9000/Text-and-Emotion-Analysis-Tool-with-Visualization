@@ -1,0 +1,76 @@
+COMBINATION OF EMOTIONS
+
+language detection and translate to English most accurately to process emotions but store the outputs with the corresponding text row in foreign language
+language wise sort
+
+Analyse political sentiment of text eg left/right, lib/auth
+
+give a "show all" option given a datatype, which shows average of all other parameters for the given datatype, other datatypes and sorting by parameters
+for example selecting show all on agegroup would show averages of values of countryname time likes comments etc etc and also averages of their frequencies emotions impacts etc etc
+
+Categorise emotions into two types positive and negative
+to tone add the sum of all positive emotions' values and subtract all negative emotions' values
+
+add a multi layer multi type searching option
+to look for some text from a specified country specified username specified agegroup specified time
+eg show all users who tweeted viking from country at noon of agegroups 0-20 20-30 and 30-40
+
+show all texts or countries or remaining datatypes from other datatypes
+for example
+which agegroup tweets the most at a given datatime at a given country
+which username tweets the most of a given agegroup
+show the most active agegroup at the time of noon
+show the least active agegroup from Swahili
+which time does a given country tweet the most and the least
+
+give a search option as per data type to sort by and user input
+eg show all users from usa who have the most negative impact on their speeches
+show the most joyful texts from agegroup 20-30
+show the most active agegroup countrywise
+
+add a progress bar to file processing
+print a message on screen when files are made
+
+much of the data output is wrong to verify the logic
+
+
+
+
+
+**Instruction for Code Handling:**
+
+1. **No Modifications Without Explicit Instructions:**
+   - Under no circumstances should you modify, delete, remove, optimize, or change any part of the code unless explicitly instructed to do so.
+
+2. **Do Not Alter the Code Automatically:**
+   - Do not attempt to make any changes to the code, including formatting, optimization, or refactoring, unless specifically asked to.
+
+3. **Report the Issue First:**
+   - If a problem is identified in the code, you must:
+     - Clearly state what the exact issue is.
+     - Explain the root cause of the issue.
+     - Provide the corrected code for only the specific section causing the issue.
+   - Example of a report:
+     
+The issue: [Description of the issue]
+     The root cause: [Explanation of why this issue occurs]
+     Proposed fix: [Exact corrected code for the problematic section]
+
+
+4. **No Changes Outside the Faulty Code:**
+   - When fixing code, only and strictly modify the part of the code directly causing the issue.
+   - Do not touch, alter, adjust, or optimize any other part of the code, even if it appears redundant or poorly written.
+
+5. **Adherence to Context:**
+   - The current state of the code must be treated as the final reference.
+   - Do not assume, interpret, or speculate about additional requirements beyond what has been explicitly stated.
+
+6. **Confirmation Before Execution:**
+   - Before applying any changes, confirm the proposed fixes with an explanation of how they resolve the issue.
+
+7. **Maintain Code Integrity:**
+   - Always ensure that the functionality of the code outside the addressed issue remains completely intact and unchanged.
+
+8. **Respect Line Preservation:**
+   - If instructed to add new lines of code, ensure that no existing code lines are replaced or removed unless explicitly stated.
+

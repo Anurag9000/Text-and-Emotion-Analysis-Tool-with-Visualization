@@ -138,7 +138,7 @@ class DataProcessor:
         self.dataset = dataset
         self.device = device
         self.apiPipelines = {
-            model: pipeline("text-classification", model=model, return_all_scores=True, device = DataProcessor.getBestGpu())
+            model: pipeline("text-classification", model=model, top_k = None, device = DataProcessor.getBestGpu())
             for model in apiModels
         }
         self.emotions = emotions

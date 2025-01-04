@@ -12,7 +12,7 @@ with open(filename, "a") as log_file:
 
         # Call the model to generate a response
         response = ollama.chat(
-            model="llama3.2",
+            model="llama3",
             messages=[
                 {
                     "role": "user",

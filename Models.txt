@@ -1,0 +1,89 @@
+# Sample code to test API for finiteautomata/bertweet-base-emotion-analysis
+from transformers import pipeline
+
+# Initialize the API pipeline for the model
+model_api = pipeline("text-classification", model="j-hartmann/emotion-English-distilroberta-base", return_all_scores=True)
+
+# Input sentence
+sentence = "I am so happy today!"
+
+# Get the output from the API
+output = model_api(sentence)
+
+# Print the results
+print("Scores for all emotions:")
+for emotion_scores in output:
+    for score in emotion_scores:
+        print(f"Label: {score['label']}, Score: {score['score']}")
+
+
+
+
+# Sample code to test API for bhadresh-savani/bert-base-go-emotion
+from transformers import pipeline
+
+# Initialize the API pipeline for the model
+model_api = pipeline("text-classification", model="bhadresh-savani/bert-base-go-emotion", return_all_scores=True)
+
+# Input sentence
+sentence = "I am so happy today!"
+
+# Get the output from the API
+output = model_api(sentence)
+
+# Print the results
+print("Scores for all emotions:")
+for emotion_scores in output:
+    for score in emotion_scores:
+        print(f"Label: {score['label']}, Score: {score['score']}")
+
+
+
+
+
+
+
+
+
+# Sample code to test API for monologg/bert-base-cased-goemotions-original
+from transformers import pipeline
+
+# Initialize the API pipeline for the model
+model_api = pipeline("text-classification", model="monologg/bert-base-cased-goemotions-original", return_all_scores=True)
+
+# Input sentence
+sentence = "I am so happy today!"
+
+# Get the output from the API
+output = model_api(sentence)
+
+# Print the results
+print("Scores for all emotions:")
+for emotion_scores in output:
+    for score in emotion_scores:
+        print(f"Label: {score['label']}, Score: {score['score']}")
+
+
+
+
+
+
+
+
+# Sample code to test API for finiteautomata/bertweet-base-emotion-analysis
+from transformers import pipeline
+
+# Initialize the API pipeline for the model
+model_api = pipeline("text-classification", model="finiteautomata/bertweet-base-emotion-analysis", return_all_scores=True)
+
+# Input sentence
+sentence = "I am so happy today!"
+
+# Get the output from the API
+output = model_api(sentence)
+
+# Print the results
+print("Scores for all emotions:")
+for emotion_scores in output:
+    for score in emotion_scores:
+        print(f"Label: {score['label']}, Score: {score['score']}")
