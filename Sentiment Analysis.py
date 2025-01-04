@@ -1,3 +1,5 @@
+import ollama
+from ollama import chat
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 from transformers import pipeline
@@ -333,6 +335,143 @@ class ComplexEmotionProcessor:
         self.processWords()
         self.processTexts()
 
+
+    def __init__(self, tempTextsPath, tempWordsPath, outputTextsPath, outputWordsPath):
+        self.tempTextsPath = tempTextsPath
+        self.tempWordsPath = tempWordsPath
+        self.outputTextsPath = outputTextsPath
+        self.outputWordsPath = outputWordsPath
+
+    def processFile(self, filePath, outputFilePath):
+        instruction_text = (            )
+
+        try:
+            # Load the input data
+            data = pd.read_csv(filePath)
+
+            # Initialize new columns
+            economicScores, socialScores, economicImpacts, socialImpacts = [], [], [], []
+
+            for index, row in data.iterrows():
+                try:
+                    text = row['text']
+                    likes = int(row.get('likes', 0))
+                    comments = int(row.get('comments', 0))
+
+                    # Prepend instruction text to the input
+                    formatted_input = f"{instruction_text} Text: {text}"
+
+                    # Pass the text to the scoring model
+                    response = chat(
+                        model="llama3.2",
+                        messages=[{"role": "user", "content": formatted_input}]
+                    )
+                    scores = response['message']['content'].split(", ")
+
+                    economicScore = float(scores[0])
+                    socialScore = float(scores[1])
+
+                    # Calculate impacts
+                    economicImpact = economicScore * ((likes // 10) + comments)
+                    socialImpact = socialScore * ((likes // 10) + comments)
+
+                    # Append calculated values
+                    economicScores.append(economicScore)
+                    socialScores.append(socialScore)
+                    economicImpacts.append(economicImpact)
+                    socialImpacts.append(socialImpact)
+
+                except Exception as e:
+                    print(f"Error processing row {index}: {e}")
+                    # Default values in case of error
+                    economicScores.append(0)
+                    socialScores.append(0)
+                    economicImpacts.append(0)
+                    socialImpacts.append(0)
+
+            # Add new columns to the DataFrame
+            data['economic_score'] = economicScores
+            data['social_score'] = socialScores
+            data['economic_impact'] = economicImpacts
+            data['social_impact'] = socialImpacts
+
+            # Save the updated DataFrame
+            data.to_csv(outputFilePath, index=False)
+            print(f"Processed file saved to {outputFilePath}")
+
+        except FileNotFoundError:
+            print(f"Error: File {filePath} not found.")
+        except pd.errors.EmptyDataError:
+            print(f"Error: File {filePath} is empty.")
+        except Exception as e:
+            print(f"Unexpected error while processing {filePath}: {e}")
+
+    def process(self):
+        print("Processing political scores for texts...")
+        self.processFile(self.tempTextsPath, self.outputTextsPath)
+
+        print("Processing political scores for words...")
+        self.processFile(self.tempWordsPath, self.outputWordsPath)
+
+class PoliticalScoreProcessor:
+    def __init__(self, sentimentDataset, outputTextsPath):
+        self.sentimentDataset = sentimentDataset  # Use sentiment_dataset directly
+        self.outputTextsPath = outputTextsPath
+
+    def processTexts(self):
+        instruction_text = ("You will analyze a series of statements and assign two scores for each based on the specified axes. The X-axis represents economic ideology and ranges from -1 to 1. Negative scores on the X-axis indicate left-wing economic perspectives, which emphasize collective welfare, government regulation, wealth redistribution, and public ownership, while positive scores on the X-axis reflect right-wing economic perspectives, prioritizing free markets, minimal government intervention, privatization, and individual entrepreneurship. The Y-axis represents social ideology, also ranging from -1 to 1. Negative scores on the Y-axis indicate liberal perspectives, characterized by personal freedoms, openness to social change, reduced state control, and the protection of individual rights, while positive scores on the Y-axis represent authoritarian perspectives, emphasizing state control, law and order, adherence to traditional values, and limited individual freedoms for societal goals. For example, a statement advocating for universal healthcare funded through progressive taxation would score approximately -0.8 on the X-axis and -0.6 on the Y-axis, reflecting a left-wing economic perspective with moderately liberal social implications. A statement supporting the deregulation of financial markets and reduced corporate tax would score around 0.9 on the X-axis and 0 on the Y-axis, indicating a strongly right-wing economic position with neutral social implications. A statement calling for strict government surveillance to combat crime would score around 0 on the X-axis and 0.8 on the Y-axis, reflecting a neutral economic stance with a strongly authoritarian social perspective. A statement promoting gender equality and the legalization of same-sex marriage would score approximately 0 on the X-axis and -0.9 on the Y-axis, demonstrating a neutral economic stance and strongly liberal social perspective. Additional examples include a statement advocating for wealth redistribution through high taxes on the rich (-0.9, -0.2), the privatization of public schools (0.8, 0.2), government mandates for wearing uniforms in public schools (0.3, 0.6), support for environmental regulation of businesses (-0.7, -0.3), opposition to immigration (0, 0.7), promoting free college education funded by the state (-1, -0.4), and support for maintaining traditional family structures through policy incentives (0.2, 0.8). A statement proposing a ban on public protests for national security would score around 0.1 on the X-axis and 0.9 on the Y-axis, while one advocating for reducing military budgets to fund social welfare programs would score -0.8 on the X-axis and -0.6 on the Y-axis. For every statement, evaluate its economic and social implications independently, and provide scores within the range of -1 to 1. Your reply must strictly adhere to the format: score on x axis, score on y axis. Do not provide any additional explanation, context, or formatting—only the two scores in the specified format for each statement. You will analyze a series of statements and assign two scores for each based on the specified axes. The X-axis represents economic ideology and ranges from -1 to 1. Negative scores on the X-axis indicate left-wing economic perspectives, which emphasize collective welfare, government regulation, wealth redistribution, and public ownership, while positive scores on the X-axis reflect right-wing economic perspectives, prioritizing free markets, minimal government intervention, privatization, and individual entrepreneurship. The Y-axis represents social ideology, also ranging from -1 to 1. Negative scores on the Y-axis indicate liberal perspectives, characterized by personal freedoms, openness to social change, reduced state control, and the protection of individual rights, while positive scores on the Y-axis represent authoritarian perspectives, emphasizing state control, law and order, adherence to traditional values, and limited individual freedoms for societal goals. If a statement is neutral, normal, a question, or has no clear political or ideological connotation, you must assign the score 0, 0. Examples include The sky is blue, What is your favorite color? I enjoy painting, or The weather is pleasant today. These types of statements, which are descriptive, interrogative, or unrelated to political or ideological frameworks, must always receive the score 0, 0. Under no circumstances should you return anything other than the score in the exact format: score on x axis, score on y axis. For every statement, evaluate its economic and social implications independently, and if it does not align with the ideological framework, always return 0, 0."
+        )
+
+        # Initialize new columns for scores and impacts
+        economicScores, socialScores, economicImpacts, socialImpacts = [], [], [], []
+
+        for index, row in self.sentimentDataset.iterrows():
+            try:
+                text = row['text']
+                likes = int(row.get('likes', 0))
+                comments = int(row.get('comments', 0))
+
+                # Prepend instruction text to the input
+                formatted_input = f"{instruction_text} Text: {text}"
+
+                # Pass the text to the scoring model
+                response = chat(
+                    model="llama3.1",
+                    messages=[{"role": "user", "content": formatted_input}]
+                )
+                scores = response['message']['content'].split(", ")
+
+                economicScore = float(scores[0])
+                socialScore = float(scores[1])
+
+                # Calculate impacts
+                economicImpact = economicScore * ((likes // 10) + comments)
+                socialImpact = socialScore * ((likes // 10) + comments)
+
+                # Append calculated values
+                economicScores.append(economicScore)
+                socialScores.append(socialScore)
+                economicImpacts.append(economicImpact)
+                socialImpacts.append(socialImpact)
+
+            except Exception as e:
+                print(f"Error processing row {index}: {e}")
+                # Default values in case of error
+                economicScores.append(0)
+                socialScores.append(0)
+                economicImpacts.append(0)
+                socialImpacts.append(0)
+
+        # Add new columns to the DataFrame
+        self.sentimentDataset['economic_score'] = economicScores
+        self.sentimentDataset['social_score'] = socialScores
+        self.sentimentDataset['economic_impact'] = economicImpacts
+        self.sentimentDataset['social_impact'] = socialImpacts
+
+        # Save the updated DataFrame
+        self.sentimentDataset.to_csv(self.outputTextsPath, index=False)
+        print(f"Processed file saved to {self.outputTextsPath}")
+
 class Visualizer:
     def __init__(self, textsDf, wordsDf):
         self.textsDf = textsDf
@@ -449,6 +588,7 @@ class GUIHandler:
         root.mainloop()
 
 def checkAndCreateFiles(fileHandler, dataProcessor):
+    # Check for the existence of temp files
     textsExists = os.path.exists('temptexts.csv')
     wordsExists = os.path.exists('tempwords.csv')
 
@@ -463,34 +603,68 @@ def checkAndCreateFiles(fileHandler, dataProcessor):
         if not wordsExists:
             print("'tempwords.csv' is missing. Generating...")
             fileHandler.createWordsCsv()
-    except Exception as e:
-        print(f"Error while creating files: {e}")
 
-    if textsExists or wordsExists:
-        regenerate = input("One or both files already exist. Do you want to regenerate them? (yes/no): ").strip().lower()
-        if regenerate.startswith('y'):
-            fileHandler.createTextsCsv(
-                dataProcessor.calculateToneImpact,
-                dataProcessor.calculateFrequency,
-                dataProcessor
+        # Process political scores ONLY for texts
+        print("Processing political scores...")
+        sentimentDataset = pd.read_csv("temptexts.csv")  # Load the dataset for text processing
+        politicalScoreProcessor = PoliticalScoreProcessor(
+            sentimentDataset=sentimentDataset,
+            outputTextsPath="texts.csv"
+        )
+        # Only process texts for political and economic scores
+        print("Processing political scores for texts...")
+        politicalScoreProcessor.processTexts()
+
+    except Exception as e:
+        print(f"Error while creating files or processing political scores: {e}")
+
+    # Ensure files include necessary economic and social scores
+    try:
+        print("Verifying final files include economic and social scores...")
+        if not os.path.exists("texts.csv"):
+            print("Error: 'texts.csv' is missing. Reprocessing 'temptexts.csv'...")
+            sentimentDataset = pd.read_csv("temptexts.csv")
+            politicalScoreProcessor = PoliticalScoreProcessor(
+                sentimentDataset=sentimentDataset,
+                outputTextsPath="texts.csv"
             )
-            fileHandler.createWordsCsv()
+            politicalScoreProcessor.processTexts()
+    except Exception as e:
+        print(f"Error during final verification of files: {e}")
 
 def main():
     # Load all stopwords using DataProcessor
-    allStopwords = DataProcessor.getAllStopwords()
+    try:
+        allStopwords = DataProcessor.getAllStopwords()
+    except Exception as e:
+        print(f"Error loading stopwords: {e}")
+        return
 
     # Initialize GPU selection
-    bestGpu = DataProcessor.getBestGpu()
-    if bestGpu != -1:
-        device = torch.device(f"cuda:{bestGpu}")
-        print(f"Using GPU: {bestGpu}")
-    else:
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Using device: {device}")
+    try:
+        bestGpu = DataProcessor.getBestGpu()
+        if bestGpu != -1:
+            device = torch.device(f"cuda:{bestGpu}")
+            print(f"Using GPU: {bestGpu}")
+        else:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            print(f"Using device: {device}")
+    except Exception as e:
+        print(f"Error initializing device: {e}")
+        return
 
     # Load datasets
-    hf_dataset = Dataset.from_csv('sentiment_dataset.csv')
+    try:
+        hf_dataset = Dataset.from_csv('sentiment_dataset.csv')
+    except FileNotFoundError:
+        print("Error: 'sentiment_dataset.csv' not found. Ensure the file is in the correct directory.")
+        return
+    except pd.errors.EmptyDataError:
+        print("Error: 'sentiment_dataset.csv' is empty. Provide a valid dataset.")
+        return
+    except Exception as e:
+        print(f"Unexpected error loading dataset: {e}")
+        return
 
     # List of models for API pipelines
     apiModels = [
@@ -501,103 +675,133 @@ def main():
     ]
 
     # Initialize DataProcessor and FileHandler
-    emotions = []
-    dataProcessor = DataProcessor(hf_dataset, device, apiModels, emotions)
-    fileHandler = FileHandler(hf_dataset, allStopwords, emotions, dataProcessor)
+    try:
+        emotions = []
+        dataProcessor = DataProcessor(hf_dataset, device, apiModels, emotions)
+        fileHandler = FileHandler(hf_dataset, allStopwords, emotions, dataProcessor)
+    except Exception as e:
+        print(f"Error initializing DataProcessor or FileHandler: {e}")
+        return
 
-    # Check and create files
-    checkAndCreateFiles(fileHandler, dataProcessor)
+    # Check and create files with political scores
+    try:
+        checkAndCreateFiles(fileHandler, dataProcessor)
+    except Exception as e:
+        print(f"Error in checkAndCreateFiles: {e}")
+        return
 
     # Define filtered_emotions dictionary
     filtered_emotions = {
-    "compassion": ["caring", "sadness"],
-    "elation": ["joy", "excitement"],
-    "affection": ["love", "approval"],
-    "contentment": ["relief", "joy"],
-    "playfulness": ["amusement", "joy"],
-    "empathy": ["caring", "sadness"],
-    "warmth": ["love", "caring"],
-    "frustration": ["annoyance", "anger"],
-    "shame": ["embarrassment", "disapproval"],
-    "regret": ["remorse", "sadness"],
-    "guilt": ["remorse", "grief"],
-    "loneliness": ["sadness", "neutral"],
-    "disdain": ["disapproval", "disgust"],
-    "curiosity": ["confusion", "optimism"],
-    "skepticism": ["confusion", "realization"],
-    "uncertainty": ["confusion", "neutral"],
-    "triumph": ["pride", "joy"],
-    "reluctance": ["disapproval", "desire"],
-    "apathy": ["neutral", "sadness"],
-    "nostalgia": ["joy", "sadness"],
-    "intrigue": ["curiosity", "desire"],
-    "hopefulness": ["optimism", "joy"],
-    "bliss": ["joy", "relief"],
-    "fascination": ["curiosity", "admiration"],
-    "passion": ["love", "desire"],
-    "hopelessness": ["sadness", "disappointment"],
-    "bitterness": ["sadness", "anger"],
-    "gratefulness": ["gratitude", "relief"],
-    "agitation": ["annoyance", "nervousness"],
-    "yearning": ["desire", "sadness"],
-    "sorrow": ["grief", "sadness"],
-    "delight": ["joy", "amusement"],
-    "trepidation": ["fear", "nervousness"],
-    "amazement": ["surprise", "joy", "admiration"],
-    "complacency": ["neutral", "relief", "approval"],
-    "disillusionment": ["sadness", "disappointment", "realization"],
-    "zeal": ["excitement", "pride", "desire"],
-    "reverence": ["admiration", "gratitude"],
-    "infatuation": ["love", "desire", "admiration"],
-    "composure": ["relief", "neutral", "caring"],
-    "ecstasy": ["joy", "excitement", "love"],
-    "anticipation": ["excitement", "optimism", "curiosity"],
-    "resignation": ["sadness", "relief"],
-    "hostility": ["anger", "disgust", "annoyance"],
-    "disorientation": ["confusion", "fear", "surprise"],
-    "compunction": ["remorse", "sadness", "grief"],
-    "humility": ["gratitude", "relief", "approval"],
-    "serenity": ["joy", "relief", "caring"],
-    "reconciliation": ["relief", "love", "gratitude"],
-    "alienation": ["sadness", "disgust", "disapproval"],
-    "exultation": ["pride", "joy", "excitement"],
-    "affirmation": ["approval", "optimism", "pride"],
-    "serendipity": ["joy", "surprise", "relief"],
-    "acceptance": ["relief", "approval", "caring"],
-    "resentment": ["sadness", "anger", "disapproval"],
-    "cheerfulness": ["joy", "amusement", "optimism"],
-    "apprehension": ["fear", "nervousness", "curiosity"],
-    "eagerness": ["excitement", "curiosity"],
-    "clarity": ["relief", "realization", "caring"],
-    "hesitation": ["fear", "nervousness", "confusion"],
-    "grievance": ["anger", "sadness", "disappointment"],
-    "outrage": ["anger", "disapproval", "disgust"],
-    "pity": ["sadness", "caring"],
-    "shock": ["surprise", "fear", "disgust"],
-    "satisfaction": ["relief", "joy", "approval"]
-    }
+        "compassion": ["caring", "sadness"],
+        "elation": ["joy", "excitement"],
+        "affection": ["love", "approval"],
+        "contentment": ["relief", "joy"],
+        "playfulness": ["amusement", "joy"],
+        "empathy": ["caring", "sadness"],
+        "warmth": ["love", "caring"],
+        "frustration": ["annoyance", "anger"],
+        "shame": ["embarrassment", "disapproval"],
+        "regret": ["remorse", "sadness"],
+        "guilt": ["remorse", "grief"],
+        "loneliness": ["sadness", "neutral"],
+        "disdain": ["disapproval", "disgust"],
+        "curiosity": ["confusion", "optimism"],
+        "skepticism": ["confusion", "realization"],
+        "uncertainty": ["confusion", "neutral"],
+        "triumph": ["pride", "joy"],
+        "reluctance": ["disapproval", "desire"],
+        "apathy": ["neutral", "sadness"],
+        "nostalgia": ["joy", "sadness"],
+        "intrigue": ["curiosity", "desire"],
+        "hopefulness": ["optimism", "joy"],
+        "bliss": ["joy", "relief"],
+        "fascination": ["curiosity", "admiration"],
+        "passion": ["love", "desire"],
+        "hopelessness": ["sadness", "disappointment"],
+        "bitterness": ["sadness", "anger"],
+        "gratefulness": ["gratitude", "relief"],
+        "agitation": ["annoyance", "nervousness"],
+        "yearning": ["desire", "sadness"],
+        "sorrow": ["grief", "sadness"],
+        "delight": ["joy", "amusement"],
+        "trepidation": ["fear", "nervousness"],
+        "amazement": ["surprise", "joy", "admiration"],
+        "complacency": ["neutral", "relief", "approval"],
+        "disillusionment": ["sadness", "disappointment", "realization"],
+        "zeal": ["excitement", "pride", "desire"],
+        "reverence": ["admiration", "gratitude"],
+        "infatuation": ["love", "desire", "admiration"],
+        "composure": ["relief", "neutral", "caring"],
+        "ecstasy": ["joy", "excitement", "love"],
+        "anticipation": ["excitement", "optimism", "curiosity"],
+        "resignation": ["sadness", "relief"],
+        "hostility": ["anger", "disgust", "annoyance"],
+        "disorientation": ["confusion", "fear", "surprise"],
+        "compunction": ["remorse", "sadness", "grief"],
+        "humility": ["gratitude", "relief", "approval"],
+        "serenity": ["joy", "relief", "caring"],
+        "reconciliation": ["relief", "love", "gratitude"],
+        "alienation": ["sadness", "disgust", "disapproval"],
+        "exultation": ["pride", "joy", "excitement"],
+        "affirmation": ["approval", "optimism", "pride"],
+        "serendipity": ["joy", "surprise", "relief"],
+        "acceptance": ["relief", "approval", "caring"],
+        "resentment": ["sadness", "anger", "disapproval"],
+        "cheerfulness": ["joy", "amusement", "optimism"],
+        "apprehension": ["fear", "nervousness", "curiosity"],
+        "eagerness": ["excitement", "curiosity"],
+        "clarity": ["relief", "realization", "caring"],
+        "hesitation": ["fear", "nervousness", "confusion"],
+        "grievance": ["anger", "sadness", "disappointment"],
+        "outrage": ["anger", "disapproval", "disgust"],
+        "pity": ["sadness", "caring"],
+        "shock": ["surprise", "fear", "disgust"],
+        "satisfaction": ["relief", "joy", "approval"]
+        }
+
 
 
     # Process complex emotions
-    complexEmotionProcessor = ComplexEmotionProcessor(
-        tempWordsPath="tempwords.csv",
-        tempTextsPath="temptexts.csv",
-        outputWordsPath="words.csv",
-        outputTextsPath="texts.csv",
-        filteredEmotions=filtered_emotions
-    )
-    complexEmotionProcessor.process()
+    try:
+        complexEmotionProcessor = ComplexEmotionProcessor(
+            tempWordsPath="tempwords.csv",
+            tempTextsPath="temptexts.csv",
+            outputWordsPath="words.csv",
+            outputTextsPath="texts.csv",
+            filteredEmotions=filtered_emotions
+        )
+        complexEmotionProcessor.process()
+    except Exception as e:
+        print(f"Error processing complex emotions: {e}")
+        return
 
     # Load dataframes for visualization
-    textsDf = hf_dataset.to_pandas()
-    wordsDf = pd.read_csv('words.csv')
+    try:
+        textsDf = hf_dataset.to_pandas()
+        wordsDf = pd.read_csv('words.csv')
+    except FileNotFoundError as e:
+        print(f"Error loading processed files: {e}")
+        return
+    except pd.errors.EmptyDataError as e:
+        print(f"Processed file is empty: {e}")
+        return
+    except Exception as e:
+        print(f"Unexpected error loading dataframes: {e}")
+        return
 
     # Initialize Visualizer and GUIHandler
-    visualizer = Visualizer(textsDf, wordsDf)
-    guiHandler = GUIHandler(visualizer)
+    try:
+        visualizer = Visualizer(textsDf, wordsDf)
+        guiHandler = GUIHandler(visualizer)
+    except Exception as e:
+        print(f"Error initializing Visualizer or GUIHandler: {e}")
+        return
 
     # Launch GUI
-    guiHandler.launchGUI()
+    try:
+        guiHandler.launchGUI()
+    except Exception as e:
+        print(f"Error launching GUI: {e}")
 
 if __name__ == "__main__":
     main()
