@@ -2,7 +2,7 @@ import ollama
 from ollama import chat
 import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
-from transformers import pipeline
+from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
 from collections import defaultdict
 import re
 import matplotlib.pyplot as plt
@@ -13,11 +13,8 @@ import spacy
 from datasets import Dataset
 import pandas as pd
 import os
-nltk.download('stopwords')
 import torch
-from transformers import AutoTokenizer, XLMRobertaTokenizer
 import psutil
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -335,84 +332,6 @@ class ComplexEmotionProcessor:
         self.processWords()
         self.processTexts()
 
-
-    def __init__(self, tempTextsPath, tempWordsPath, outputTextsPath, outputWordsPath):
-        self.tempTextsPath = tempTextsPath
-        self.tempWordsPath = tempWordsPath
-        self.outputTextsPath = outputTextsPath
-        self.outputWordsPath = outputWordsPath
-
-    def processFile(self, filePath, outputFilePath):
-        instruction_text = (            )
-
-        try:
-            # Load the input data
-            data = pd.read_csv(filePath)
-
-            # Initialize new columns
-            economicScores, socialScores, economicImpacts, socialImpacts = [], [], [], []
-
-            for index, row in data.iterrows():
-                try:
-                    text = row['text']
-                    likes = int(row.get('likes', 0))
-                    comments = int(row.get('comments', 0))
-
-                    # Prepend instruction text to the input
-                    formatted_input = f"{instruction_text} Text: {text}"
-
-                    # Pass the text to the scoring model
-                    response = chat(
-                        model="llama3.2",
-                        messages=[{"role": "user", "content": formatted_input}]
-                    )
-                    scores = response['message']['content'].split(", ")
-
-                    economicScore = float(scores[0])
-                    socialScore = float(scores[1])
-
-                    # Calculate impacts
-                    economicImpact = economicScore * ((likes // 10) + comments)
-                    socialImpact = socialScore * ((likes // 10) + comments)
-
-                    # Append calculated values
-                    economicScores.append(economicScore)
-                    socialScores.append(socialScore)
-                    economicImpacts.append(economicImpact)
-                    socialImpacts.append(socialImpact)
-
-                except Exception as e:
-                    print(f"Error processing row {index}: {e}")
-                    # Default values in case of error
-                    economicScores.append(0)
-                    socialScores.append(0)
-                    economicImpacts.append(0)
-                    socialImpacts.append(0)
-
-            # Add new columns to the DataFrame
-            data['economic_score'] = economicScores
-            data['social_score'] = socialScores
-            data['economic_impact'] = economicImpacts
-            data['social_impact'] = socialImpacts
-
-            # Save the updated DataFrame
-            data.to_csv(outputFilePath, index=False)
-            print(f"Processed file saved to {outputFilePath}")
-
-        except FileNotFoundError:
-            print(f"Error: File {filePath} not found.")
-        except pd.errors.EmptyDataError:
-            print(f"Error: File {filePath} is empty.")
-        except Exception as e:
-            print(f"Unexpected error while processing {filePath}: {e}")
-
-    def process(self):
-        print("Processing political scores for texts...")
-        self.processFile(self.tempTextsPath, self.outputTextsPath)
-
-        print("Processing political scores for words...")
-        self.processFile(self.tempWordsPath, self.outputWordsPath)
-
 class PoliticalScoreProcessor:
     def __init__(self, sentimentDataset, outputTextsPath):
         self.sentimentDataset = sentimentDataset  # Use sentiment_dataset directly
@@ -436,7 +355,7 @@ class PoliticalScoreProcessor:
 
                 # Pass the text to the scoring model
                 response = chat(
-                    model="llama3.1",
+                    model="llama3.2",
                     messages=[{"role": "user", "content": formatted_input}]
                 )
                 scores = response['message']['content'].split(", ")
