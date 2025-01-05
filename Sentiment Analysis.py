@@ -346,7 +346,6 @@ class PoliticalScoreProcessor:
 
         for index, row in self.sentimentDataset.iterrows():
             try:
-                print(f"Processing row {index}: {row['text']}")
                 text = row['text']
                 likes = int(row.get('likes', 0))
                 comments = int(row.get('comments', 0))
