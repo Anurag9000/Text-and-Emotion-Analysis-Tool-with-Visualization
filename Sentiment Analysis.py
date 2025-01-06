@@ -1,6 +1,4 @@
-import ollama
 from ollama import chat
-import nltk
 from nltk.sentiment import SentimentIntensityAnalyzer
 from transformers import pipeline, AutoTokenizer, AutoModelForSequenceClassification
 from collections import defaultdict
@@ -14,7 +12,6 @@ from datasets import Dataset
 import pandas as pd
 import os
 import torch
-import psutil
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -332,6 +329,30 @@ class ComplexEmotionProcessor:
         self.processWords()
         self.processTexts()
 
+class ToneAdjuster:
+    def __init__(self, positiveEmotions, negativeEmotions):
+        self.positiveEmotions = positiveEmotions
+        self.negativeEmotions = negativeEmotions
+
+    def adjustToneAndImpact(self, df):
+        if "tone" not in df.columns:
+            print("Tone column is missing from DataFrame.")
+            return df
+
+        positiveSum = df[self.positiveEmotions].sum(axis=1)
+        negativeSum = df[self.negativeEmotions].sum(axis=1)
+
+        # Adjust tone
+        df["adjusted_tone"] = df["tone"] + positiveSum - negativeSum
+
+        # Adjust impact based on new tone
+        if "likes" in df.columns and "comments" in df.columns:
+            df["adjusted_impact"] = df["adjusted_tone"] * ((df["likes"] // 10) + df["comments"])
+        else:
+            print("Likes or comments column missing. Impact cannot be recalculated.")
+
+        return df
+
 class PoliticalScoreProcessor:
     def __init__(self, sentimentDataset, outputTextsPath):
         self.sentimentDataset = sentimentDataset  # Use sentiment_dataset directly
@@ -346,6 +367,7 @@ class PoliticalScoreProcessor:
 
         for index, row in self.sentimentDataset.iterrows():
             try:
+                print(f"Processing row {index}: {row['text']}")
                 text = row['text']
                 likes = int(row.get('likes', 0))
                 comments = int(row.get('comments', 0))
@@ -703,6 +725,43 @@ def main():
     except Exception as e:
         print(f"Error in PoliticalScoreProcessor: {e}")
         return
+
+    # Tone Adjustment Step
+    try:
+        print("Applying tone adjustments...")
+        # Load the final texts dataset
+        textsDf = pd.read_csv("texts.csv")
+
+        # Define positive and negative emotions
+        positiveEmotions = ["joy", "approval", "admiration", "optimism", "caring", "relief", "gratitude",
+                            "amusement", "pride", "excitement", "desire", "curiosity", "love",
+                            "impact_joy", "impact_approval", "impact_admiration", "impact_optimism",
+                            "impact_caring", "impact_relief", "impact_gratitude", "impact_amusement",
+                            "impact_pride", "impact_excitement", "impact_desire", "impact_curiosity",
+                            "emotion_compassion", "emotion_elation", "emotion_affection", "emotion_contentment",
+                            "emotion_playfulness", "emotion_cheerfulness", "emotion_hopefulness",
+                            "emotion_fascination", "emotion_bliss", "emotion_serenity", "emotion_gratefulness",
+                            "emotion_reconciliation", "emotion_anticipation", "emotion_exultation"]
+        negativeEmotions = ["sadness", "anger", "disgust", "fear", "disapproval", "confusion", "annoyance",
+                            "disappointment", "nervousness", "embarrassment", "remorse", "grief",
+                            "impact_sadness", "impact_anger", "impact_disgust", "impact_fear",
+                            "impact_disapproval", "impact_confusion", "impact_annoyance", "impact_disappointment",
+                            "impact_nervousness", "impact_embarrassment", "impact_remorse", "impact_grief",
+                            "emotion_frustration", "emotion_shame", "emotion_regret", "emotion_guilt",
+                            "emotion_loneliness", "emotion_disdain", "emotion_hopelessness", "emotion_bitterness",
+                            "emotion_resentment", "emotion_hostility", "emotion_disorientation", "emotion_compunction",
+                            "emotion_outrage", "emotion_pity", "emotion_grievance"]
+
+        # Apply ToneAdjuster
+        toneAdjuster = ToneAdjuster(positiveEmotions, negativeEmotions)
+        adjustedTextsDf = toneAdjuster.adjustToneAndImpact(textsDf)
+
+        # Save the adjusted DataFrame
+        adjustedTextsDf.to_csv("adjusted_texts.csv", index=False)
+        print("Adjusted texts saved to 'adjusted_texts.csv'.")
+
+    except Exception as e:
+        print(f"Error applying tone adjustments: {e}")
 
     print("Pipeline completed successfully.")
 
