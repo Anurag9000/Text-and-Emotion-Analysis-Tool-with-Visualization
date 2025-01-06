@@ -338,8 +338,8 @@ class ToneAdjuster:
             print("Tone column is missing from DataFrame.")
             return df
 
-        positiveSum = df[self.positiveEmotions].sum(axis=1)
-        negativeSum = df[self.negativeEmotions].sum(axis=1)
+        positiveSum = df[[col for col in self.positiveEmotions if col in df.columns]].sum(axis=1, skipna=True)
+        negativeSum = df[[col for col in self.negativeEmotions if col in df.columns]].sum(axis=1, skipna=True)
 
         # Adjust tone
         df["adjusted_tone"] = df["tone"] + positiveSum - negativeSum
@@ -349,6 +349,25 @@ class ToneAdjuster:
             df["adjusted_impact"] = df["adjusted_tone"] * ((df["likes"] // 10) + df["comments"])
         else:
             print("Likes or comments column missing. Impact cannot be recalculated.")
+
+        return df
+
+    def adjustWordsToneAndImpact(self, df):
+        if "tone" not in df.columns:
+            print("Tone column is missing from words DataFrame.")
+            return df
+
+        positiveSum = df[[col for col in self.positiveEmotions if col in df.columns]].sum(axis=1, skipna=True)
+        negativeSum = df[[col for col in self.negativeEmotions if col in df.columns]].sum(axis=1, skipna=True)
+
+        # Adjust tone for words
+        df["adjusted_tone"] = df["tone"] + positiveSum - negativeSum
+
+        # Adjust impact based on new tone
+        if "frequency" in df.columns:
+            df["adjusted_impact"] = df["adjusted_tone"] * df["frequency"]
+        else:
+            print("Frequency column missing. Impact cannot be recalculated for words.")
 
         return df
 
@@ -701,7 +720,6 @@ def main():
                 "shock": ["surprise", "fear", "disgust"],
                 "satisfaction": ["relief", "joy", "approval"]
                 }
-
         )
         complexEmotionProcessor.process()
     except Exception as e:
@@ -719,43 +737,59 @@ def main():
     except Exception as e:
         print(f"Error in PoliticalScoreProcessor: {e}")
         return
+    
+    positiveEmotions = [
+        "joy", "approval", "admiration", "optimism", "caring", "relief", "gratitude", "amusement", "pride",
+        "excitement", "desire", "curiosity", "emotion_compassion", "emotion_elation", "emotion_affection",
+        "emotion_contentment", "emotion_playfulness", "emotion_empathy", "emotion_warmth", "emotion_triumph",
+        "emotion_nostalgia", "emotion_hopefulness", "emotion_bliss", "emotion_fascination", "emotion_passion",
+        "emotion_delight", "emotion_amazement", "emotion_zeal", "emotion_reverence", "emotion_infatuation",
+        "emotion_composure", "emotion_ecstasy", "emotion_anticipation", "emotion_serendipity", "emotion_acceptance",
+        "emotion_cheerfulness", "emotion_eagerness", "emotion_clarity", "emotion_gratefulness",
+        "emotion_joy", "emotion_approval", "emotion_excitement", "emotion_admiration", "emotion_caring",
+        "emotion_amusement", "emotion_gratitude", "emotion_optimism", "emotion_pride", "emotion_relief"
+    ]
 
-    # Tone Adjustment Step
+    negativeEmotions = [
+        "surprise", "sadness", "neutral", "fear", "anger", "disgust", "realization", "disapproval", "annoyance",
+        "disappointment", "confusion", "nervousness", "embarrassment", "remorse", "love", "grief",
+        "emotion_frustration", "emotion_shame", "emotion_regret", "emotion_guilt", "emotion_loneliness",
+        "emotion_disdain", "emotion_skepticism", "emotion_uncertainty", "emotion_reluctance", "emotion_apathy",
+        "emotion_bitterness", "emotion_agitation", "emotion_yearning", "emotion_sorrow", "emotion_trepidation",
+        "emotion_complacency", "emotion_disillusionment", "emotion_resignation", "emotion_hostility",
+        "emotion_disorientation", "emotion_compunction", "emotion_humility", "emotion_serenity", "emotion_reconciliation",
+        "emotion_alienation", "emotion_exultation", "emotion_affirmation", "emotion_resentment", "emotion_hesitation",
+        "emotion_grievance", "emotion_outrage", "emotion_pity", "emotion_shock", "emotion_satisfaction",
+        "emotion_surprise", "emotion_sadness", "emotion_fear", "emotion_anger", "emotion_disgust",
+        "emotion_disapproval", "emotion_disappointment", "emotion_confusion", "emotion_nervousness",
+        "emotion_embarrassment", "emotion_grief", "emotion_remorse"
+    ]
+
+
+    # Tone Adjustment Step for Texts
     try:
-        print("Applying tone adjustments...")
-        # Load the final texts dataset
+        print("Applying tone adjustments for texts...")
         textsDf = pd.read_csv("texts.csv")
 
-        # Define positive and negative emotions
-        positiveEmotions = ["joy", "approval", "admiration", "optimism", "caring", "relief", "gratitude",
-                            "amusement", "pride", "excitement", "desire", "curiosity", "love",
-                            "impact_joy", "impact_approval", "impact_admiration", "impact_optimism",
-                            "impact_caring", "impact_relief", "impact_gratitude", "impact_amusement",
-                            "impact_pride", "impact_excitement", "impact_desire", "impact_curiosity",
-                            "emotion_compassion", "emotion_elation", "emotion_affection", "emotion_contentment",
-                            "emotion_playfulness", "emotion_cheerfulness", "emotion_hopefulness",
-                            "emotion_fascination", "emotion_bliss", "emotion_serenity", "emotion_gratefulness",
-                            "emotion_reconciliation", "emotion_anticipation", "emotion_exultation"]
-        negativeEmotions = ["sadness", "anger", "disgust", "fear", "disapproval", "confusion", "annoyance",
-                            "disappointment", "nervousness", "embarrassment", "remorse", "grief",
-                            "impact_sadness", "impact_anger", "impact_disgust", "impact_fear",
-                            "impact_disapproval", "impact_confusion", "impact_annoyance", "impact_disappointment",
-                            "impact_nervousness", "impact_embarrassment", "impact_remorse", "impact_grief",
-                            "emotion_frustration", "emotion_shame", "emotion_regret", "emotion_guilt",
-                            "emotion_loneliness", "emotion_disdain", "emotion_hopelessness", "emotion_bitterness",
-                            "emotion_resentment", "emotion_hostility", "emotion_disorientation", "emotion_compunction",
-                            "emotion_outrage", "emotion_pity", "emotion_grievance"]
-
-        # Apply ToneAdjuster
         toneAdjuster = ToneAdjuster(positiveEmotions, negativeEmotions)
         adjustedTextsDf = toneAdjuster.adjustToneAndImpact(textsDf)
 
-        # Save the adjusted DataFrame
         adjustedTextsDf.to_csv("adjusted_texts.csv", index=False)
         print("Adjusted texts saved to 'adjusted_texts.csv'.")
-
     except Exception as e:
-        print(f"Error applying tone adjustments: {e}")
+        print(f"Error applying tone adjustments for texts: {e}")
+
+    # Tone Adjustment Step for Words
+    try:
+        print("Applying tone adjustments for words...")
+        wordsDf = pd.read_csv("words.csv")
+        toneAdjuster = ToneAdjuster(positiveEmotions, negativeEmotions)
+        adjustedWordsDf = toneAdjuster.adjustWordsToneAndImpact(wordsDf)
+
+        adjustedWordsDf.to_csv("adjusted_words.csv", index=False)
+        print("Adjusted words saved to 'adjusted_words.csv'.")
+    except Exception as e:
+        print(f"Error applying tone adjustments for words: {e}")
 
     print("Pipeline completed successfully.")
 
