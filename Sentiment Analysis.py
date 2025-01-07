@@ -22,19 +22,12 @@ class FileHandler:
         self.emotions = emotions
         self.dataProcessor = dataProcessor  # Store the dataProcessor instance
 
-    def createTextsCsv(self, calculateToneImpact, calculateFrequency, dataProcessor):
+    def createTextsCsv(self, calculateToneImpact, dataProcessor):
         def addToneAndImpact(dataset):
             try:
                 return dataset.map(calculateToneImpact, batched=True)
             except Exception as e:
                 print(f"Error in 'addToneAndImpact': {e}")
-                return dataset
-
-        def addFrequencies(dataset):
-            try:
-                return dataset.map(calculateFrequency, batched=True)
-            except Exception as e:
-                print(f"Error in 'addFrequencies': {e}")
                 return dataset
 
         def addEmotions(dataset):
@@ -74,13 +67,12 @@ class FileHandler:
         print("Creating 'temptexts.csv'...")
         dataset = self.dataset
         dataset = addToneAndImpact(dataset)
-        dataset = addFrequencies(dataset)
         dataset = addEmotions(dataset)
         dataset.to_csv('temptexts.csv', index=False)
 
     def createWordsCsv(self):
         def processWords(wordData, row):
-            words = re.findall(r'\b\w+\b', row['text'].lower())
+            words = re.findall(r'\b\w+\b', row['text'].lower())  # Tokenize and normalize case
             for word in words:
                 try:
                     wordEmotionScores = self.dataProcessor.extractEmotions({"text": [word]})
@@ -96,7 +88,7 @@ class FileHandler:
                             **{f"impact_{emotion}": 0 for emotion in wordEmotionScores.keys()},
                         }
 
-                    wordData[word]['frequency'] += 1
+                    wordData[word]['frequency'] += 1  # Increment global frequency
                     wordData[word]['likes'] += int(row['likes'])
                     wordData[word]['comments'] += int(row['comments'])
                     wordData[word]['tone'] += float(SentimentIntensityAnalyzer().polarity_scores(word)['compound'])
@@ -105,7 +97,6 @@ class FileHandler:
                     )
 
                     for emotion, score in wordEmotionScores.items():
-                        # Aggregate scores (e.g., take the first value if it's a list)
                         score = score[0] if isinstance(score, list) else score
                         wordData[word][f"emotion_{emotion}"] += score
                         wordData[word][f"impact_{emotion}"] += score * (
@@ -114,7 +105,6 @@ class FileHandler:
 
                 except Exception as e:
                     print(f"Error processing word '{word}': {e}")
-
 
         print("Creating 'tempwords.csv'...")
         wordData = {}
@@ -182,15 +172,6 @@ class DataProcessor:
             for tone, likes, comments in zip(tones, batch['likes'], batch['comments'])
         ]
         return {"tone": tones, "impact": impacts}
-
-    def calculateFrequency(self, batch):
-        wordFrequency = defaultdict(int)
-        for text in batch['text']:
-            words = text.split()
-            for word in words:
-                wordFrequency[word] += 1
-        frequencies = [sum(wordFrequency.get(word, 0) for word in text.split()) for text in batch['text']]
-        return {"frequency": frequencies}
 
     def extractEmotions(self, batch):
         emotionScores = defaultdict(list)
@@ -363,14 +344,13 @@ class ToneAdjuster:
         # Adjust tone for words
         df["adjusted_tone"] = df["tone"] + positiveSum - negativeSum
 
-        # Adjust impact based on new tone
-        if "frequency" in df.columns:
-            df["adjusted_impact"] = df["adjusted_tone"] * df["frequency"]
+        # Adjust impact based on likes and comments instead of frequency
+        if "likes" in df.columns and "comments" in df.columns:
+            df["adjusted_impact"] = df["adjusted_tone"] * ((df["likes"] // 10) + df["comments"])
         else:
-            print("Frequency column missing. Impact cannot be recalculated for words.")
+            print("Likes or comments column missing. Adjusted impact cannot be calculated.")
 
         return df
-
 class PoliticalScoreProcessor:
     def __init__(self, sentimentDataset, outputTextsPath):
         self.sentimentDataset = sentimentDataset  # Use sentiment_dataset directly
@@ -554,7 +534,6 @@ def checkAndCreateFiles(fileHandler, dataProcessor):
             print("'temptexts.csv' is missing. Generating...")
             fileHandler.createTextsCsv(
                 dataProcessor.calculateToneImpact,
-                dataProcessor.calculateFrequency,
                 dataProcessor
             )
         if not wordsExists:
