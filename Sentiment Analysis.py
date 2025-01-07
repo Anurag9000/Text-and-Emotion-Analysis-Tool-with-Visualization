@@ -64,16 +64,16 @@ class FileHandler:
                 print(f"Error in 'addEmotions': {e}")
                 return dataset
 
-        print("Creating 'temptexts.csv'...")
+        print("Creating 'temp1texts.csv'...")
         dataset = self.dataset
         dataset = addToneAndImpact(dataset)
         dataset = addEmotions(dataset)
-        dataset.to_csv('temptexts.csv', index=False)
+        dataset.to_csv('temp1texts.csv', index=False)
 
     def createWordsCsv(self):
         def processWords(wordData, row):
-            words = re.findall(r'\b\w+\b', row['text'].lower())  # Tokenize and normalize case
-            for word in words:
+            temp2words = re.findall(r'\b\w+\b', row['text'].lower())  # Tokenize and normalize case
+            for word in temp2words:
                 try:
                     wordEmotionScores = self.dataProcessor.extractEmotions({"text": [word]})
 
@@ -106,7 +106,7 @@ class FileHandler:
                 except Exception as e:
                     print(f"Error processing word '{word}': {e}")
 
-        print("Creating 'tempwords.csv'...")
+        print("Creating 'temp1words.csv'...")
         wordData = {}
 
         for row in self.dataset:
@@ -117,7 +117,7 @@ class FileHandler:
 
         wordDf = pd.DataFrame.from_dict(wordData, orient='index').reset_index()
         wordDf.rename(columns={"index": "word"}, inplace=True)
-        wordDf.to_csv('tempwords.csv', index=False)
+        wordDf.to_csv('temp1words.csv', index=False)
 
 class DataProcessor:
     def __init__(self, dataset, device, apiModels, emotions):
@@ -213,9 +213,9 @@ class DataProcessor:
         return emotionImpacts
 
 class ComplexEmotionProcessor:
-    def __init__(self, tempWordsPath, tempTextsPath, outputWordsPath, outputTextsPath, filteredEmotions):
-        self.tempWordsPath = tempWordsPath
-        self.tempTextsPath = tempTextsPath
+    def __init__(self, temp1WordsPath, temp1TextsPath, outputWordsPath, outputTextsPath, filteredEmotions):
+        self.temp1WordsPath = temp1WordsPath
+        self.temp1TextsPath = temp1TextsPath
         self.outputWordsPath = outputWordsPath
         self.outputTextsPath = outputTextsPath
         self.filteredEmotions = filteredEmotions
@@ -225,7 +225,7 @@ class ComplexEmotionProcessor:
         for complexEmotion, baseEmotions in filteredEmotions.items():
             baseScores = []
             for base in baseEmotions:
-                # Handle non-prefixed columns (temptexts) and prefixed columns (tempwords)
+                # Handle non-prefixed columns (temp1texts) and prefixed columns (temp1words)
                 colName = f"emotion_{base}" if f"emotion_{base}" in row.index else base
                 if colName in row:
                     baseScores.append(row[colName])
@@ -255,40 +255,40 @@ class ComplexEmotionProcessor:
         return df
 
     def processWords(self):
-        print("Processing complex emotions for words...")
-        wordsDf = pd.read_csv(self.tempWordsPath)
+        print("Processing complex emotions for temp2words...")
+        temp2wordsDf = pd.read_csv(self.temp1WordsPath)
 
         # Calculate complex emotions
-        complexEmotionScores = wordsDf.apply(
+        complexEmotionScores = temp2wordsDf.apply(
             lambda row: self.calculateComplexEmotions(row, self.filteredEmotions), axis=1
         )
 
         # Convert complex emotions into a DataFrame
         complexEmotionDf = pd.DataFrame(complexEmotionScores.tolist())
 
-        # Drop columns from wordsDf if they already exist to prevent duplicates
-        overlappingCols = set(wordsDf.columns).intersection(set(complexEmotionDf.columns))
+        # Drop columns from temp2wordsDf if they already exist to prevent duplicates
+        overlappingCols = set(temp2wordsDf.columns).intersection(set(complexEmotionDf.columns))
         if overlappingCols:
             print(f"Removing overlapping columns: {overlappingCols}")
-            wordsDf = wordsDf.drop(columns=overlappingCols)
+            temp2wordsDf = temp2wordsDf.drop(columns=overlappingCols)
 
         # Concatenate with original DataFrame
-        updatedWordsDf = pd.concat([wordsDf, complexEmotionDf], axis=1)
+        updatedWordsDf = pd.concat([temp2wordsDf, complexEmotionDf], axis=1)
 
         # Add impact columns for complex emotions
         updatedWordsDf = self.addImpactColumns(updatedWordsDf, self.filteredEmotions)
 
         # Save the updated DataFrame
         updatedWordsDf.to_csv(self.outputWordsPath, index=False)
-        print(f"Updated words saved to {self.outputWordsPath}")
+        print(f"Updated temp2words saved to {self.outputWordsPath}")
 
 
     def processTexts(self):
-        print("Processing complex emotions for texts...")
-        textsDf = pd.read_csv(self.tempTextsPath)
+        print("Processing complex emotions for temp3texts...")
+        temp3textsDf = pd.read_csv(self.temp1TextsPath)
 
         # Calculate complex emotions
-        complexEmotionScores = textsDf.apply(
+        complexEmotionScores = temp3textsDf.apply(
             lambda row: self.calculateComplexEmotions(row, self.filteredEmotions), axis=1
         )
 
@@ -296,14 +296,14 @@ class ComplexEmotionProcessor:
         complexEmotionDf = pd.DataFrame(complexEmotionScores.tolist())
 
         # Concatenate with original DataFrame
-        updatedTextsDf = pd.concat([textsDf, complexEmotionDf], axis=1)
+        updatedtemp3textsDf = pd.concat([temp3textsDf, complexEmotionDf], axis=1)
 
         # Add impact columns for complex emotions
-        updatedTextsDf = self.addImpactColumns(updatedTextsDf, self.filteredEmotions)
+        updatedtemp3textsDf = self.addImpactColumns(updatedtemp3textsDf, self.filteredEmotions)
 
         # Save the updated DataFrame
-        updatedTextsDf.to_csv(self.outputTextsPath, index=False)
-        print(f"Updated texts saved to {self.outputTextsPath}")
+        updatedtemp3textsDf.to_csv(self.outputTextsPath, index=False)
+        print(f"Updated temp3texts saved to {self.outputTextsPath}")
 
     def process(self):
         self.processWords()
@@ -335,13 +335,13 @@ class ToneAdjuster:
 
     def adjustWordsToneAndImpact(self, df):
         if "tone" not in df.columns:
-            print("Tone column is missing from words DataFrame.")
+            print("Tone column is missing from temp2words DataFrame.")
             return df
 
         positiveSum = df[[col for col in self.positiveEmotions if col in df.columns]].sum(axis=1, skipna=True)
         negativeSum = df[[col for col in self.negativeEmotions if col in df.columns]].sum(axis=1, skipna=True)
 
-        # Adjust tone for words
+        # Adjust tone for temp2words
         df["adjusted_tone"] = df["tone"] + positiveSum - negativeSum
 
         # Adjust impact based on likes and comments instead of frequency
@@ -411,20 +411,20 @@ class PoliticalScoreProcessor:
         self.sentimentDataset.to_csv(self.outputTextsPath, index=False)
 
 class Visualizer:
-    def __init__(self, textsDf, wordsDf):
-        self.textsDf = textsDf
-        self.wordsDf = wordsDf
+    def __init__(self, temp3textsDf, temp2wordsDf):
+        self.temp3textsDf = temp3textsDf
+        self.temp2wordsDf = temp2wordsDf
 
     def groupAndSummarizeData(self, selection, sortBy):
         """
         Group and summarize the data based on the user's selection and sort criteria.
         """
-        if selection in ['words', 'texts']:
-            grouped = self.wordsDf.groupby('word', as_index=False).sum() if selection == 'words' else self.textsDf.groupby('text', as_index=False).sum()
+        if selection in ['temp2words', 'temp3texts']:
+            grouped = self.temp2wordsDf.groupby('word', as_index=False).sum() if selection == 'temp2words' else self.temp3textsDf.groupby('text', as_index=False).sum()
             grouped = grouped[[selection[:-1], sortBy]].sort_values(by=sortBy, ascending=False)
         elif selection in ['agegroup', 'country', 'time', 'userid']:
-            if selection in self.textsDf.columns:
-                grouped = self.textsDf.groupby(selection, as_index=False).sum()
+            if selection in self.temp3textsDf.columns:
+                grouped = self.temp3textsDf.groupby(selection, as_index=False).sum()
                 grouped = grouped[[selection, sortBy]].sort_values(by=sortBy, ascending=False)
             else:
                 print(f"Column '{selection}' not found in the dataset.")
@@ -477,7 +477,7 @@ class Visualizer:
 
             if graphType != 'Pie':
                 plt.ylabel(column.capitalize())
-                plt.xlabel(selection.capitalize() if selection not in ['words', 'texts'] else selection.capitalize())
+                plt.xlabel(selection.capitalize() if selection not in ['temp2words', 'temp3texts'] else selection.capitalize())
 
             plt.tight_layout()
             plt.show()
@@ -498,10 +498,10 @@ class GUIHandler:
         """
         Dynamically load column names based on the user's selection.
         """
-        if selection in ['texts', 'words']:
-            filePath = 'adjusted_texts.csv' if selection == 'texts' else 'adjusted_words.csv'
+        if selection in ['temp3texts', 'temp2words']:
+            filePath = 'adjusted_texts.csv' if selection == 'temp3texts' else 'adjusted_words.csv'
         elif selection in ['agegroup', 'country', 'time', 'userid']:
-            filePath = 'adjusted_texts.csv'  # Assuming these columns are in the same file as `texts`.
+            filePath = 'adjusted_texts.csv'  # Assuming these columns are in the same file as `temp3texts`.
         else:
             print(f"Dynamic columns not applicable for selection: {selection}")
             return []
@@ -558,14 +558,14 @@ class GUIHandler:
         root.title("Data Selection")
         root.resizable(False, False)
 
-        selectionVar = tk.StringVar(value='texts')
+        selectionVar = tk.StringVar(value='temp3texts')
         sortByVar = tk.StringVar(value='impact')
         thresholdVar = tk.StringVar(value='Highest')
         countVar = tk.StringVar(value='10')
         graphTypeVar = tk.StringVar(value='Bar')
 
         tk.Label(root, text="Select Data Type:").pack()
-        dataTypeMenu = ttk.Combobox(root, textvariable=selectionVar, values=['agegroup', 'country', 'texts', 'time', 'userid', 'words'], state="readonly")
+        dataTypeMenu = ttk.Combobox(root, textvariable=selectionVar, values=['agegroup', 'country', 'temp3texts', 'time', 'userid', 'temp2words'], state="readonly")
         dataTypeMenu.pack()
 
         tk.Label(root, text="Sort By:").pack()
@@ -599,29 +599,29 @@ class GUIHandler:
 
 def checkAndCreateFiles(fileHandler, dataProcessor):
     # Check for the existence of temp files
-    textsExists = os.path.exists('temptexts.csv')
-    wordsExists = os.path.exists('tempwords.csv')
+    textsExists = os.path.exists('temp1texts.csv')
+    wordsExists = os.path.exists('temp1words.csv')
 
     try:
         if not textsExists:
-            print("'temptexts.csv' is missing. Generating...")
+            print("'temp1texts.csv' is missing. Generating...")
             fileHandler.createTextsCsv(
                 dataProcessor.calculateToneImpact,
                 dataProcessor
             )
         if not wordsExists:
-            print("'tempwords.csv' is missing. Generating...")
+            print("'temp1words.csv' is missing. Generating...")
             fileHandler.createWordsCsv()
 
-        # Process political scores ONLY for texts
+        # Process political scores ONLY for temp3texts
         print("Processing political scores...")
-        sentimentDataset = pd.read_csv("temptexts.csv")  # Load the dataset for text processing
+        sentimentDataset = pd.read_csv("temp1texts.csv")  # Load the dataset for text processing
         politicalScoreProcessor = PoliticalScoreProcessor(
             sentimentDataset=sentimentDataset,
-            outputTextsPath="texts.csv"
+            outputTextsPath="temp3texts.csv"
         )
-        # Only process texts for political and economic scores
-        print("Processing political scores for texts...")
+        # Only process temp3texts for political and economic scores
+        print("Processing political scores for temp3texts...")
         politicalScoreProcessor.processTexts()
 
     except Exception as e:
@@ -630,12 +630,12 @@ def checkAndCreateFiles(fileHandler, dataProcessor):
     # Ensure files include necessary economic and social scores
     try:
         print("Verifying final files include economic and social scores...")
-        if not os.path.exists("texts.csv"):
-            print("Error: 'texts.csv' is missing. Reprocessing 'temptexts.csv'...")
-            sentimentDataset = pd.read_csv("temptexts.csv")
+        if not os.path.exists("temp3texts.csv"):
+            print("Error: 'temp3texts.csv' is missing. Reprocessing 'temp1texts.csv'...")
+            sentimentDataset = pd.read_csv("temp1texts.csv")
             politicalScoreProcessor = PoliticalScoreProcessor(
                 sentimentDataset=sentimentDataset,
-                outputTextsPath="texts.csv"
+                outputTextsPath="temp3texts.csv"
             )
             politicalScoreProcessor.processTexts()
     except Exception as e:
@@ -701,10 +701,10 @@ def main():
     # Process complex emotions BEFORE processing political scores
     try:
         complexEmotionProcessor = ComplexEmotionProcessor(
-            tempWordsPath="tempwords.csv",
-            tempTextsPath="temptexts.csv",
-            outputWordsPath="words.csv",
-            outputTextsPath="texts_temp.csv",  # Prevent overwriting texts.csv
+            temp1WordsPath="temp1words.csv",
+            temp1TextsPath="temp1texts.csv",
+            outputWordsPath="temp2words.csv",
+            outputTextsPath="temp2texts.csv",  # Prevent overwriting temp3texts.csv
             filteredEmotions = {
                 "compassion": ["caring", "sadness"],
                 "elation": ["joy", "excitement"],
@@ -781,10 +781,10 @@ def main():
 
     # Re-run PoliticalScoreProcessor to ensure it's the final step
     try:
-        sentimentDataset = pd.read_csv("texts_temp.csv")  # Use the output from complex emotions
+        sentimentDataset = pd.read_csv("temp2texts.csv")  # Use the output from complex emotions
         politicalScoreProcessor = PoliticalScoreProcessor(
             sentimentDataset=sentimentDataset,
-            outputTextsPath="texts.csv"  # Save final output here
+            outputTextsPath="temp3texts.csv"  # Save final output here
         )
         politicalScoreProcessor.processTexts()
     except Exception as e:
@@ -822,34 +822,34 @@ def main():
 
     # Tone Adjustment Step for Texts
     try:
-        print("Applying tone adjustments for texts...")
-        textsDf = pd.read_csv("texts.csv")
+        print("Applying tone adjustments for temp3texts...")
+        temp3textsDf = pd.read_csv("temp3texts.csv")
 
         toneAdjuster = ToneAdjuster(positiveEmotions, negativeEmotions)
-        adjustedTextsDf = toneAdjuster.adjustToneAndImpact(textsDf)
+        adjustedtemp3textsDf = toneAdjuster.adjustToneAndImpact(temp3textsDf)
 
-        adjustedTextsDf.to_csv("adjusted_texts.csv", index=False)
-        print("Adjusted texts saved to 'adjusted_texts.csv'.")
+        adjustedtemp3textsDf.to_csv("adjusted_texts.csv", index=False)
+        print("Adjusted temp3texts saved to 'adjusted_texts.csv'.")
     except Exception as e:
-        print(f"Error applying tone adjustments for texts: {e}")
+        print(f"Error applying tone adjustments for temp3texts: {e}")
 
     # Tone Adjustment Step for Words
     try:
-        print("Applying tone adjustments for words...")
-        wordsDf = pd.read_csv("words.csv")
+        print("Applying tone adjustments for temp2words...")
+        temp2wordsDf = pd.read_csv("temp2words.csv")
         toneAdjuster = ToneAdjuster(positiveEmotions, negativeEmotions)
-        adjustedWordsDf = toneAdjuster.adjustWordsToneAndImpact(wordsDf)
+        adjustedWordsDf = toneAdjuster.adjustWordsToneAndImpact(temp2wordsDf)
 
         adjustedWordsDf.to_csv("adjusted_words.csv", index=False)
-        print("Adjusted words saved to 'adjusted_words.csv'.")
+        print("Adjusted temp2words saved to 'adjusted_words.csv'.")
     except Exception as e:
-        print(f"Error applying tone adjustments for words: {e}")
+        print(f"Error applying tone adjustments for temp2words: {e}")
 
     # Initialize Visualizer with adjusted data
     try:
-        textsDf = pd.read_csv("adjusted_texts.csv")
-        wordsDf = pd.read_csv("adjusted_words.csv")
-        visualizer = Visualizer(textsDf, wordsDf)
+        temp3textsDf = pd.read_csv("adjusted_texts.csv")
+        temp2wordsDf = pd.read_csv("adjusted_words.csv")
+        visualizer = Visualizer(temp3textsDf, temp2wordsDf)
     except Exception as e:
         print(f"Error loading data for Visualizer: {e}")
         return
