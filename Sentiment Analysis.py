@@ -13,8 +13,6 @@ import pandas as pd
 import os
 import torch
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 class FileHandler:
     def __init__(self, dataset, stopwords, emotions, dataProcessor):
         self.dataset = dataset
@@ -72,8 +70,8 @@ class FileHandler:
 
     def createWordsCsv(self):
         def processWords(wordData, row):
-            temp2words = re.findall(r'\b\w+\b', row['text'].lower())  # Tokenize and normalize case
-            for word in temp2words:
+            words = re.findall(r'\b\w+\b', row['text'].lower())  # Tokenize and normalize case
+            for word in words:
                 try:
                     wordEmotionScores = self.dataProcessor.extractEmotions({"text": [word]})
 
@@ -119,25 +117,34 @@ class FileHandler:
         wordDf.rename(columns={"index": "word"}, inplace=True)
         wordDf.to_csv('temp1words.csv', index=False)
 
+    @staticmethod
+    def cleanTempFiles():
+        tempFiles = ['temp1texts.csv', 'temp1words.csv', 'temp2texts.csv', 'temp3texts.csv', 'temp2words.csv']
+        for file in tempFiles:
+            try:
+                if os.path.exists(file):
+                    os.remove(file)
+                    print(f"Removed temporary file: {file}")
+            except Exception as e:
+                print(f"Error removing file {file}: {e}")
+
 class DataProcessor:
     def __init__(self, dataset, device, apiModels, emotions):
         self.dataset = dataset
         self.device = device
         self.apiPipelines = {
-            model: pipeline("text-classification", model=model, top_k = None, device = DataProcessor.getBestGpu())
+            model: pipeline("text-classification", model=model, top_k=None, device=DataProcessor.getBestGpu())
             for model in apiModels
         }
         self.emotions = emotions
 
     @staticmethod
     def getAllStopwords():
-        # Get all NLTK stopwords from all languages
         nltkLanguages = stopwords.fileids()
         nltkStopwords = set()
         for lang in nltkLanguages:
             nltkStopwords.update(stopwords.words(lang))
 
-        # Load spaCy and get stopwords from all spaCy-supported languages
         spacyStopwords = set()
         spacyLanguages = [
             "af", "ar", "bg", "bn", "ca", "cs", "da", "de", "el", "en", "es", "et", "fa", "fi", "fr", "ga",
@@ -213,9 +220,9 @@ class DataProcessor:
         return emotionImpacts
 
 class ComplexEmotionProcessor:
-    def __init__(self, temp1WordsPath, temp1TextsPath, outputWordsPath, outputTextsPath, filteredEmotions):
-        self.temp1WordsPath = temp1WordsPath
-        self.temp1TextsPath = temp1TextsPath
+    def __init__(self, tempWordsPath, tempTextsPath, outputWordsPath, outputTextsPath, filteredEmotions):
+        self.tempWordsPath = tempWordsPath
+        self.tempTextsPath = tempTextsPath
         self.outputWordsPath = outputWordsPath
         self.outputTextsPath = outputTextsPath
         self.filteredEmotions = filteredEmotions
@@ -225,13 +232,11 @@ class ComplexEmotionProcessor:
         for complexEmotion, baseEmotions in filteredEmotions.items():
             baseScores = []
             for base in baseEmotions:
-                # Handle non-prefixed columns (temp1texts) and prefixed columns (temp1words)
                 colName = f"emotion_{base}" if f"emotion_{base}" in row.index else base
                 if colName in row:
                     baseScores.append(row[colName])
                 else:
                     print(f"Missing column: {colName}")
-            # Calculate average if baseScores are available
             complexEmotionScores[f"emotion_{complexEmotion}"] = (
                 sum(baseScores) / len(baseScores) if baseScores else 0
             )
@@ -255,55 +260,40 @@ class ComplexEmotionProcessor:
         return df
 
     def processWords(self):
-        print("Processing complex emotions for temp2words...")
-        temp2wordsDf = pd.read_csv(self.temp1WordsPath)
+        print("Processing complex emotions for words...")
+        wordsDf = pd.read_csv(self.tempWordsPath)
 
-        # Calculate complex emotions
-        complexEmotionScores = temp2wordsDf.apply(
+        complexEmotionScores = wordsDf.apply(
             lambda row: self.calculateComplexEmotions(row, self.filteredEmotions), axis=1
         )
 
-        # Convert complex emotions into a DataFrame
         complexEmotionDf = pd.DataFrame(complexEmotionScores.tolist())
 
-        # Drop columns from temp2wordsDf if they already exist to prevent duplicates
-        overlappingCols = set(temp2wordsDf.columns).intersection(set(complexEmotionDf.columns))
+        overlappingCols = set(wordsDf.columns).intersection(set(complexEmotionDf.columns))
         if overlappingCols:
             print(f"Removing overlapping columns: {overlappingCols}")
-            temp2wordsDf = temp2wordsDf.drop(columns=overlappingCols)
+            wordsDf = wordsDf.drop(columns=overlappingCols)
 
-        # Concatenate with original DataFrame
-        updatedWordsDf = pd.concat([temp2wordsDf, complexEmotionDf], axis=1)
-
-        # Add impact columns for complex emotions
+        updatedWordsDf = pd.concat([wordsDf, complexEmotionDf], axis=1)
         updatedWordsDf = self.addImpactColumns(updatedWordsDf, self.filteredEmotions)
 
-        # Save the updated DataFrame
         updatedWordsDf.to_csv(self.outputWordsPath, index=False)
-        print(f"Updated temp2words saved to {self.outputWordsPath}")
-
+        print(f"Updated words saved to {self.outputWordsPath}")
 
     def processTexts(self):
-        print("Processing complex emotions for temp3texts...")
-        temp3textsDf = pd.read_csv(self.temp1TextsPath)
+        print("Processing complex emotions for texts...")
+        textsDf = pd.read_csv(self.tempTextsPath)
 
-        # Calculate complex emotions
-        complexEmotionScores = temp3textsDf.apply(
+        complexEmotionScores = textsDf.apply(
             lambda row: self.calculateComplexEmotions(row, self.filteredEmotions), axis=1
         )
 
-        # Convert complex emotions into a DataFrame
         complexEmotionDf = pd.DataFrame(complexEmotionScores.tolist())
+        updatedTextsDf = pd.concat([textsDf, complexEmotionDf], axis=1)
+        updatedTextsDf = self.addImpactColumns(updatedTextsDf, self.filteredEmotions)
 
-        # Concatenate with original DataFrame
-        updatedtemp3textsDf = pd.concat([temp3textsDf, complexEmotionDf], axis=1)
-
-        # Add impact columns for complex emotions
-        updatedtemp3textsDf = self.addImpactColumns(updatedtemp3textsDf, self.filteredEmotions)
-
-        # Save the updated DataFrame
-        updatedtemp3textsDf.to_csv(self.outputTextsPath, index=False)
-        print(f"Updated temp3texts saved to {self.outputTextsPath}")
+        updatedTextsDf.to_csv(self.outputTextsPath, index=False)
+        print(f"Updated texts saved to {self.outputTextsPath}")
 
     def process(self):
         self.processWords()
@@ -322,10 +312,8 @@ class ToneAdjuster:
         positiveSum = df[[col for col in self.positiveEmotions if col in df.columns]].sum(axis=1, skipna=True)
         negativeSum = df[[col for col in self.negativeEmotions if col in df.columns]].sum(axis=1, skipna=True)
 
-        # Adjust tone
         df["adjusted_tone"] = df["tone"] + positiveSum - negativeSum
 
-        # Adjust impact based on new tone
         if "likes" in df.columns and "comments" in df.columns:
             df["adjusted_impact"] = df["adjusted_tone"] * ((df["likes"] // 10) + df["comments"])
         else:
@@ -335,16 +323,14 @@ class ToneAdjuster:
 
     def adjustWordsToneAndImpact(self, df):
         if "tone" not in df.columns:
-            print("Tone column is missing from temp2words DataFrame.")
+            print("Tone column is missing from words DataFrame.")
             return df
 
         positiveSum = df[[col for col in self.positiveEmotions if col in df.columns]].sum(axis=1, skipna=True)
         negativeSum = df[[col for col in self.negativeEmotions if col in df.columns]].sum(axis=1, skipna=True)
 
-        # Adjust tone for temp2words
         df["adjusted_tone"] = df["tone"] + positiveSum - negativeSum
 
-        # Adjust impact based on likes and comments instead of frequency
         if "likes" in df.columns and "comments" in df.columns:
             df["adjusted_impact"] = df["adjusted_tone"] * ((df["likes"] // 10) + df["comments"])
         else:
@@ -354,13 +340,12 @@ class ToneAdjuster:
 
 class PoliticalScoreProcessor:
     def __init__(self, sentimentDataset, outputTextsPath):
-        self.sentimentDataset = sentimentDataset  # Use sentiment_dataset directly
+        self.sentimentDataset = sentimentDataset
         self.outputTextsPath = outputTextsPath
 
     def processTexts(self):
         instruction_text = ("You will analyze a series of statements and assign two scores for each based on the specified axes. The X-axis represents economic ideology and ranges from -1 to 1. Negative scores on the X-axis indicate left-wing economic perspectives, which emphasize collective welfare, government regulation, wealth redistribution, and public ownership, while positive scores on the X-axis reflect right-wing economic perspectives, prioritizing free markets, minimal government intervention, privatization, and individual entrepreneurship. The Y-axis represents social ideology, also ranging from -1 to 1. Negative scores on the Y-axis indicate liberal perspectives, characterized by personal freedoms, openness to social change, reduced state control, and the protection of individual rights, while positive scores on the Y-axis represent authoritarian perspectives, emphasizing state control, law and order, adherence to traditional values, and limited individual freedoms for societal goals. For example, a statement advocating for universal healthcare funded through progressive taxation would score approximately -0.8 on the X-axis and -0.6 on the Y-axis, reflecting a left-wing economic perspective with moderately liberal social implications. A statement supporting the deregulation of financial markets and reduced corporate tax would score around 0.9 on the X-axis and 0 on the Y-axis, indicating a strongly right-wing economic position with neutral social implications. A statement calling for strict government surveillance to combat crime would score around 0 on the X-axis and 0.8 on the Y-axis, reflecting a neutral economic stance with a strongly authoritarian social perspective. A statement promoting gender equality and the legalization of same-sex marriage would score approximately 0 on the X-axis and -0.9 on the Y-axis, demonstrating a neutral economic stance and strongly liberal social perspective. Additional examples include a statement advocating for wealth redistribution through high taxes on the rich (-0.9, -0.2), the privatization of public schools (0.8, 0.2), government mandates for wearing uniforms in public schools (0.3, 0.6), support for environmental regulation of businesses (-0.7, -0.3), opposition to immigration (0, 0.7), promoting free college education funded by the state (-1, -0.4), and support for maintaining traditional family structures through policy incentives (0.2, 0.8). A statement proposing a ban on public protests for national security would score around 0.1 on the X-axis and 0.9 on the Y-axis, while one advocating for reducing military budgets to fund social welfare programs would score -0.8 on the X-axis and -0.6 on the Y-axis. For every statement, evaluate its economic and social implications independently, and provide scores within the range of -1 to 1. Your reply must strictly adhere to the format: score on x axis, score on y axis. Do not provide any additional explanation, context, or formatting—only the two scores in the specified format for each statement. You will analyze a series of statements and assign two scores for each based on the specified axes. The X-axis represents economic ideology and ranges from -1 to 1. Negative scores on the X-axis indicate left-wing economic perspectives, which emphasize collective welfare, government regulation, wealth redistribution, and public ownership, while positive scores on the X-axis reflect right-wing economic perspectives, prioritizing free markets, minimal government intervention, privatization, and individual entrepreneurship. The Y-axis represents social ideology, also ranging from -1 to 1. Negative scores on the Y-axis indicate liberal perspectives, characterized by personal freedoms, openness to social change, reduced state control, and the protection of individual rights, while positive scores on the Y-axis represent authoritarian perspectives, emphasizing state control, law and order, adherence to traditional values, and limited individual freedoms for societal goals. If a statement is neutral, normal, a question, or has no clear political or ideological connotation, you must assign the score 0, 0. Examples include The sky is blue, What is your favorite color? I enjoy painting, or The weather is pleasant today. These types of statements, which are descriptive, interrogative, or unrelated to political or ideological frameworks, must always receive the score 0, 0. Under no circumstances should you return anything other than the score in the exact format: score on x axis, score on y axis. For every statement, evaluate its economic and social implications independently, and if it does not align with the ideological framework, always return 0, 0.")
-        
-        # Initialize new columns for scores and impacts
+
         economicScores, socialScores, economicImpacts, socialImpacts = [], [], [], []
 
         for index, row in self.sentimentDataset.iterrows():
@@ -369,10 +354,8 @@ class PoliticalScoreProcessor:
                 likes = int(row.get('likes', 0))
                 comments = int(row.get('comments', 0))
 
-                # Prepend instruction text to the input
                 formatted_input = f"{instruction_text} Text: {text}"
 
-                # Pass the text to the scoring model
                 response = chat(
                     model="llama3.2",
                     messages=[{"role": "user", "content": formatted_input}]
@@ -382,11 +365,9 @@ class PoliticalScoreProcessor:
                 economicScore = float(scores[0])
                 socialScore = float(scores[1])
 
-                # Calculate impacts
                 economicImpact = economicScore * ((likes // 10) + comments)
                 socialImpact = socialScore * ((likes // 10) + comments)
 
-                # Append calculated values
                 economicScores.append(economicScore)
                 socialScores.append(socialScore)
                 economicImpacts.append(economicImpact)
@@ -399,32 +380,26 @@ class PoliticalScoreProcessor:
                 economicImpacts.append(0)
                 socialImpacts.append(0)
 
-        # Add new columns to the DataFrame
         self.sentimentDataset['economic_score'] = economicScores
         self.sentimentDataset['social_score'] = socialScores
         self.sentimentDataset['economic_impact'] = economicImpacts
         self.sentimentDataset['social_impact'] = socialImpacts
 
-        print("Columns added to DataFrame:")
-
-        # Save the updated DataFrame
         self.sentimentDataset.to_csv(self.outputTextsPath, index=False)
+        print("Political scores processing completed.")
 
 class Visualizer:
-    def __init__(self, temp3textsDf, temp2wordsDf):
-        self.temp3textsDf = temp3textsDf
-        self.temp2wordsDf = temp2wordsDf
+    def __init__(self, textsDf, wordsDf):
+        self.textsDf = textsDf
+        self.wordsDf = wordsDf
 
     def groupAndSummarizeData(self, selection, sortBy):
-        """
-        Group and summarize the data based on the user's selection and sort criteria.
-        """
-        if selection in ['temp2words', 'temp3texts']:
-            grouped = self.temp2wordsDf.groupby('word', as_index=False).sum() if selection == 'temp2words' else self.temp3textsDf.groupby('text', as_index=False).sum()
+        if selection in ['words', 'texts']:
+            grouped = self.wordsDf.groupby('word', as_index=False).sum() if selection == 'words' else self.textsDf.groupby('text', as_index=False).sum()
             grouped = grouped[[selection[:-1], sortBy]].sort_values(by=sortBy, ascending=False)
         elif selection in ['agegroup', 'country', 'time', 'userid']:
-            if selection in self.temp3textsDf.columns:
-                grouped = self.temp3textsDf.groupby(selection, as_index=False).sum()
+            if selection in self.textsDf.columns:
+                grouped = self.textsDf.groupby(selection, as_index=False).sum()
                 grouped = grouped[[selection, sortBy]].sort_values(by=sortBy, ascending=False)
             else:
                 print(f"Column '{selection}' not found in the dataset.")
@@ -435,11 +410,7 @@ class Visualizer:
 
         return grouped
 
-
     def sliceData(self, df, threshold, countVal):
-        """
-        Slice the data based on the specified threshold and count.
-        """
         if threshold == 'Highest':
             return df.head(countVal)
         elif threshold == 'Lowest':
@@ -455,9 +426,6 @@ class Visualizer:
             return pd.DataFrame()
 
     def plotData(self, df, column, graphType, selection, sortBy, actualCount):
-        """
-        Plot the data based on user specifications.
-        """
         plt.figure(figsize=(10, 6))
 
         try:
@@ -477,7 +445,7 @@ class Visualizer:
 
             if graphType != 'Pie':
                 plt.ylabel(column.capitalize())
-                plt.xlabel(selection.capitalize() if selection not in ['temp2words', 'temp3texts'] else selection.capitalize())
+                plt.xlabel(selection.capitalize() if selection not in ['words', 'texts'] else selection.capitalize())
 
             plt.tight_layout()
             plt.show()
@@ -495,13 +463,10 @@ class GUIHandler:
         self.graphType = None
 
     def loadDynamicColumns(self, selection):
-        """
-        Dynamically load column names based on the user's selection.
-        """
-        if selection in ['temp3texts', 'temp2words']:
-            filePath = 'adjusted_texts.csv' if selection == 'temp3texts' else 'adjusted_words.csv'
+        if selection in ['texts', 'words']:
+            filePath = 'texts.csv' if selection == 'texts' else 'words.csv'
         elif selection in ['agegroup', 'country', 'time', 'userid']:
-            filePath = 'adjusted_texts.csv'  # Assuming these columns are in the same file as `temp3texts`.
+            filePath = 'texts.csv'
         else:
             print(f"Dynamic columns not applicable for selection: {selection}")
             return []
@@ -514,9 +479,6 @@ class GUIHandler:
             return []
 
     def updateSortByOptions(self, event, sortByMenu, selectionVar):
-        """
-        Update the Sort By dropdown options based on the selected data type.
-        """
         selection = selectionVar.get()
         columns = self.loadDynamicColumns(selection)
         if columns:
@@ -525,9 +487,6 @@ class GUIHandler:
             sortByMenu["values"] = []
 
     def onSubmit(self, selectionVar, sortByVar, thresholdVar, countVar, graphTypeVar):
-        """
-        Handle the logic when the Submit button is clicked.
-        """
         self.selection = selectionVar.get()
         self.sortBy = sortByVar.get()
         self.threshold = thresholdVar.get()
@@ -551,28 +510,24 @@ class GUIHandler:
             self.visualizer.plotData(dfSliced, self.sortBy, self.graphType, self.selection, self.sortBy, actualCount)
 
     def launchGUI(self):
-        """
-        Launch the GUI for user interaction.
-        """
         root = tk.Tk()
         root.title("Data Selection")
         root.resizable(False, False)
 
-        selectionVar = tk.StringVar(value='temp3texts')
+        selectionVar = tk.StringVar(value='texts')
         sortByVar = tk.StringVar(value='impact')
         thresholdVar = tk.StringVar(value='Highest')
         countVar = tk.StringVar(value='10')
         graphTypeVar = tk.StringVar(value='Bar')
 
         tk.Label(root, text="Select Data Type:").pack()
-        dataTypeMenu = ttk.Combobox(root, textvariable=selectionVar, values=['agegroup', 'country', 'temp3texts', 'time', 'userid', 'temp2words'], state="readonly")
+        dataTypeMenu = ttk.Combobox(root, textvariable=selectionVar, values=['agegroup', 'country', 'texts', 'time', 'userid', 'words'], state="readonly")
         dataTypeMenu.pack()
 
         tk.Label(root, text="Sort By:").pack()
         sortByMenu = ttk.Combobox(root, textvariable=sortByVar, values=['impact', 'tone', 'likes', 'comments', 'frequency'], state="readonly")
         sortByMenu.pack()
 
-        # Bind event to update Sort By options dynamically
         dataTypeMenu.bind("<<ComboboxSelected>>", lambda event: self.updateSortByOptions(event, sortByMenu, selectionVar))
 
         tk.Label(root, text="Threshold:").pack()
@@ -587,69 +542,24 @@ class GUIHandler:
         graphTypeMenu = ttk.Combobox(
             root,
             textvariable=graphTypeVar,
-            values=['Bar', 'Line', 'Pie'],  # Most common graph types
+            values=['Bar', 'Line', 'Pie'],
             state="readonly"
         )
         graphTypeMenu.pack()
 
-
         tk.Button(root, text="Submit", command=lambda: self.onSubmit(selectionVar, sortByVar, thresholdVar, countVar, graphTypeVar)).pack()
+
+        FileHandler.cleanTempFiles()
 
         root.mainloop()
 
-def checkAndCreateFiles(fileHandler, dataProcessor):
-    # Check for the existence of temp files
-    textsExists = os.path.exists('temp1texts.csv')
-    wordsExists = os.path.exists('temp1words.csv')
-
-    try:
-        if not textsExists:
-            print("'temp1texts.csv' is missing. Generating...")
-            fileHandler.createTextsCsv(
-                dataProcessor.calculateToneImpact,
-                dataProcessor
-            )
-        if not wordsExists:
-            print("'temp1words.csv' is missing. Generating...")
-            fileHandler.createWordsCsv()
-
-        # Process political scores ONLY for temp3texts
-        print("Processing political scores...")
-        sentimentDataset = pd.read_csv("temp1texts.csv")  # Load the dataset for text processing
-        politicalScoreProcessor = PoliticalScoreProcessor(
-            sentimentDataset=sentimentDataset,
-            outputTextsPath="temp3texts.csv"
-        )
-        # Only process temp3texts for political and economic scores
-        print("Processing political scores for temp3texts...")
-        politicalScoreProcessor.processTexts()
-
-    except Exception as e:
-        print(f"Error while creating files or processing political scores: {e}")
-
-    # Ensure files include necessary economic and social scores
-    try:
-        print("Verifying final files include economic and social scores...")
-        if not os.path.exists("temp3texts.csv"):
-            print("Error: 'temp3texts.csv' is missing. Reprocessing 'temp1texts.csv'...")
-            sentimentDataset = pd.read_csv("temp1texts.csv")
-            politicalScoreProcessor = PoliticalScoreProcessor(
-                sentimentDataset=sentimentDataset,
-                outputTextsPath="temp3texts.csv"
-            )
-            politicalScoreProcessor.processTexts()
-    except Exception as e:
-        print(f"Error during final verification of files: {e}")
-
 def main():
-    # Load all stopwords using DataProcessor
     try:
         allStopwords = DataProcessor.getAllStopwords()
     except Exception as e:
         print(f"Error loading stopwords: {e}")
         return
 
-    # Initialize GPU selection
     try:
         bestGpu = DataProcessor.getBestGpu()
         if bestGpu != -1:
@@ -662,7 +572,6 @@ def main():
         print(f"Error initializing device: {e}")
         return
 
-    # Load datasets
     try:
         hf_dataset = Dataset.from_csv('sentiment_dataset.csv')
     except FileNotFoundError:
@@ -675,14 +584,12 @@ def main():
         print(f"Unexpected error loading dataset: {e}")
         return
 
-    # List of models for API pipelines
     apiModels = [
         "j-hartmann/emotion-English-distilroberta-base",
         "bhadresh-savani/bert-base-go-emotion",
         "monologg/bert-base-cased-goemotions-original",
     ]
 
-    # Initialize DataProcessor and FileHandler
     try:
         emotions = []
         dataProcessor = DataProcessor(hf_dataset, device, apiModels, emotions)
@@ -691,105 +598,100 @@ def main():
         print(f"Error initializing DataProcessor or FileHandler: {e}")
         return
 
-    # Check and create files with political scores
-    try:
-        checkAndCreateFiles(fileHandler, dataProcessor)
-    except Exception as e:
-        print(f"Error in checkAndCreateFiles: {e}")
-        return
+    # Check and create necessary files
+    if not os.path.exists("texts.csv") or not os.path.exists("words.csv"):
+        try:
+            print("Required files missing. Generating all necessary files...")
+            fileHandler.createTextsCsv(dataProcessor.calculateToneImpact, dataProcessor)
+            fileHandler.createWordsCsv()
 
-    # Process complex emotions BEFORE processing political scores
-    try:
-        complexEmotionProcessor = ComplexEmotionProcessor(
-            temp1WordsPath="temp1words.csv",
-            temp1TextsPath="temp1texts.csv",
-            outputWordsPath="temp2words.csv",
-            outputTextsPath="temp2texts.csv",  # Prevent overwriting temp3texts.csv
-            filteredEmotions = {
-                "compassion": ["caring", "sadness"],
-                "elation": ["joy", "excitement"],
-                "affection": ["love", "approval"],
-                "contentment": ["relief", "joy"],
-                "playfulness": ["amusement", "joy"],
-                "empathy": ["caring", "sadness"],
-                "warmth": ["love", "caring"],
-                "frustration": ["annoyance", "anger"],
-                "shame": ["embarrassment", "disapproval"],
-                "regret": ["remorse", "sadness"],
-                "guilt": ["remorse", "grief"],
-                "loneliness": ["sadness", "neutral"],
-                "disdain": ["disapproval", "disgust"],
-                "curiosity": ["confusion", "optimism"],
-                "skepticism": ["confusion", "realization"],
-                "uncertainty": ["confusion", "neutral"],
-                "triumph": ["pride", "joy"],
-                "reluctance": ["disapproval", "desire"],
-                "apathy": ["neutral", "sadness"],
-                "nostalgia": ["joy", "sadness"],
-                "intrigue": ["curiosity", "desire"],
-                "hopefulness": ["optimism", "joy"],
-                "bliss": ["joy", "relief"],
-                "fascination": ["curiosity", "admiration"],
-                "passion": ["love", "desire"],
-                "hopelessness": ["sadness", "disappointment"],
-                "bitterness": ["sadness", "anger"],
-                "gratefulness": ["gratitude", "relief"],
-                "agitation": ["annoyance", "nervousness"],
-                "yearning": ["desire", "sadness"],
-                "sorrow": ["grief", "sadness"],
-                "delight": ["joy", "amusement"],
-                "trepidation": ["fear", "nervousness"],
-                "amazement": ["surprise", "joy", "admiration"],
-                "complacency": ["neutral", "relief", "approval"],
-                "disillusionment": ["sadness", "disappointment", "realization"],
-                "zeal": ["excitement", "pride", "desire"],
-                "reverence": ["admiration", "gratitude"],
-                "infatuation": ["love", "desire", "admiration"],
-                "composure": ["relief", "neutral", "caring"],
-                "ecstasy": ["joy", "excitement", "love"],
-                "anticipation": ["excitement", "optimism", "curiosity"],
-                "resignation": ["sadness", "relief"],
-                "hostility": ["anger", "disgust", "annoyance"],
-                "disorientation": ["confusion", "fear", "surprise"],
-                "compunction": ["remorse", "sadness", "grief"],
-                "humility": ["gratitude", "relief", "approval"],
-                "serenity": ["joy", "relief", "caring"],
-                "reconciliation": ["relief", "love", "gratitude"],
-                "alienation": ["sadness", "disgust", "disapproval"],
-                "exultation": ["pride", "joy", "excitement"],
-                "affirmation": ["approval", "optimism", "pride"],
-                "serendipity": ["joy", "surprise", "relief"],
-                "acceptance": ["relief", "approval", "caring"],
-                "resentment": ["sadness", "anger", "disapproval"],
-                "cheerfulness": ["joy", "amusement", "optimism"],
-                "apprehension": ["fear", "nervousness", "curiosity"],
-                "eagerness": ["excitement", "curiosity"],
-                "clarity": ["relief", "realization", "caring"],
-                "hesitation": ["fear", "nervousness", "confusion"],
-                "grievance": ["anger", "sadness", "disappointment"],
-                "outrage": ["anger", "disapproval", "disgust"],
-                "pity": ["sadness", "caring"],
-                "shock": ["surprise", "fear", "disgust"],
-                "satisfaction": ["relief", "joy", "approval"]
-                }
+            complexEmotionProcessor = ComplexEmotionProcessor(
+                tempWordsPath="temp1words.csv",
+                tempTextsPath="temp1texts.csv",
+                outputWordsPath="temp2words.csv",
+                outputTextsPath="temp3texts.csv",
+                filteredEmotions = {
+                    "compassion": ["caring", "sadness"],
+                    "elation": ["joy", "excitement"],
+                    "affection": ["love", "approval"],
+                    "contentment": ["relief", "joy"],
+                    "playfulness": ["amusement", "joy"],
+                    "empathy": ["caring", "sadness"],
+                    "warmth": ["love", "caring"],
+                    "frustration": ["annoyance", "anger"],
+                    "shame": ["embarrassment", "disapproval"],
+                    "regret": ["remorse", "sadness"],
+                    "guilt": ["remorse", "grief"],
+                    "loneliness": ["sadness", "neutral"],
+                    "disdain": ["disapproval", "disgust"],
+                    "curiosity": ["confusion", "optimism"],
+                    "skepticism": ["confusion", "realization"],
+                    "uncertainty": ["confusion", "neutral"],
+                    "triumph": ["pride", "joy"],
+                    "reluctance": ["disapproval", "desire"],
+                    "apathy": ["neutral", "sadness"],
+                    "nostalgia": ["joy", "sadness"],
+                    "intrigue": ["curiosity", "desire"],
+                    "hopefulness": ["optimism", "joy"],
+                    "bliss": ["joy", "relief"],
+                    "fascination": ["curiosity", "admiration"],
+                    "passion": ["love", "desire"],
+                    "hopelessness": ["sadness", "disappointment"],
+                    "bitterness": ["sadness", "anger"],
+                    "gratefulness": ["gratitude", "relief"],
+                    "agitation": ["annoyance", "nervousness"],
+                    "yearning": ["desire", "sadness"],
+                    "sorrow": ["grief", "sadness"],
+                    "delight": ["joy", "amusement"],
+                    "trepidation": ["fear", "nervousness"],
+                    "amazement": ["surprise", "joy", "admiration"],
+                    "complacency": ["neutral", "relief", "approval"],
+                    "disillusionment": ["sadness", "disappointment", "realization"],
+                    "zeal": ["excitement", "pride", "desire"],
+                    "reverence": ["admiration", "gratitude"],
+                    "infatuation": ["love", "desire", "admiration"],
+                    "composure": ["relief", "neutral", "caring"],
+                    "ecstasy": ["joy", "excitement", "love"],
+                    "anticipation": ["excitement", "optimism", "curiosity"],
+                    "resignation": ["sadness", "relief"],
+                    "hostility": ["anger", "disgust", "annoyance"],
+                    "disorientation": ["confusion", "fear", "surprise"],
+                    "compunction": ["remorse", "sadness", "grief"],
+                    "humility": ["gratitude", "relief", "approval"],
+                    "serenity": ["joy", "relief", "caring"],
+                    "reconciliation": ["relief", "love", "gratitude"],
+                    "alienation": ["sadness", "disgust", "disapproval"],
+                    "exultation": ["pride", "joy", "excitement"],
+                    "affirmation": ["approval", "optimism", "pride"],
+                    "serendipity": ["joy", "surprise", "relief"],
+                    "acceptance": ["relief", "approval", "caring"],
+                    "resentment": ["sadness", "anger", "disapproval"],
+                    "cheerfulness": ["joy", "amusement", "optimism"],
+                    "apprehension": ["fear", "nervousness", "curiosity"],
+                    "eagerness": ["excitement", "curiosity"],
+                    "clarity": ["relief", "realization", "caring"],
+                    "hesitation": ["fear", "nervousness", "confusion"],
+                    "grievance": ["anger", "sadness", "disappointment"],
+                    "outrage": ["anger", "disapproval", "disgust"],
+                    "pity": ["sadness", "caring"],
+                    "shock": ["surprise", "fear", "disgust"],
+                    "satisfaction": ["relief", "joy", "approval"]
+                    }
+            )
+            complexEmotionProcessor.process()
 
-        )
-        complexEmotionProcessor.process()
-    except Exception as e:
-        print(f"Error processing complex emotions: {e}")
-        return
+            sentimentDataset = pd.read_csv("temp3texts.csv")
+            politicalScoreProcessor = PoliticalScoreProcessor(
+                sentimentDataset=sentimentDataset,
+                outputTextsPath="texts.csv"
+            )
+            politicalScoreProcessor.processTexts()
 
-    # Re-run PoliticalScoreProcessor to ensure it's the final step
-    try:
-        sentimentDataset = pd.read_csv("temp2texts.csv")  # Use the output from complex emotions
-        politicalScoreProcessor = PoliticalScoreProcessor(
-            sentimentDataset=sentimentDataset,
-            outputTextsPath="temp3texts.csv"  # Save final output here
-        )
-        politicalScoreProcessor.processTexts()
-    except Exception as e:
-        print(f"Error in PoliticalScoreProcessor: {e}")
-        return
+        except Exception as e:
+            print(f"Error during file creation: {e}")
+            return
+    else:
+        print("Required files found. Skipping file creation.")
 
     positiveEmotions = [
         "joy", "approval", "admiration", "optimism", "caring", "relief", "gratitude", "amusement", "pride",
@@ -818,43 +720,37 @@ def main():
         "emotion_embarrassment", "emotion_grief", "emotion_remorse"
     ]
 
-    # Tone Adjustment Step for Sentences
-
-    # Tone Adjustment Step for Texts
     try:
-        print("Applying tone adjustments for temp3texts...")
-        temp3textsDf = pd.read_csv("temp3texts.csv")
+        print("Applying tone adjustments for texts...")
+        textsDf = pd.read_csv("texts.csv")
 
         toneAdjuster = ToneAdjuster(positiveEmotions, negativeEmotions)
-        adjustedtemp3textsDf = toneAdjuster.adjustToneAndImpact(temp3textsDf)
+        adjustedTextsDf = toneAdjuster.adjustToneAndImpact(textsDf)
 
-        adjustedtemp3textsDf.to_csv("adjusted_texts.csv", index=False)
-        print("Adjusted temp3texts saved to 'adjusted_texts.csv'.")
+        adjustedTextsDf.to_csv("texts.csv", index=False)
+        print("Adjusted texts saved to 'texts.csv'.")
     except Exception as e:
-        print(f"Error applying tone adjustments for temp3texts: {e}")
+        print(f"Error applying tone adjustments for texts: {e}")
 
-    # Tone Adjustment Step for Words
     try:
-        print("Applying tone adjustments for temp2words...")
-        temp2wordsDf = pd.read_csv("temp2words.csv")
+        print("Applying tone adjustments for words...")
+        wordsDf = pd.read_csv("temp2words.csv")
         toneAdjuster = ToneAdjuster(positiveEmotions, negativeEmotions)
-        adjustedWordsDf = toneAdjuster.adjustWordsToneAndImpact(temp2wordsDf)
+        adjustedWordsDf = toneAdjuster.adjustWordsToneAndImpact(wordsDf)
 
-        adjustedWordsDf.to_csv("adjusted_words.csv", index=False)
-        print("Adjusted temp2words saved to 'adjusted_words.csv'.")
+        adjustedWordsDf.to_csv("words.csv", index=False)
+        print("Adjusted words saved to 'words.csv'.")
     except Exception as e:
-        print(f"Error applying tone adjustments for temp2words: {e}")
+        print(f"Error applying tone adjustments for words: {e}")
 
-    # Initialize Visualizer with adjusted data
     try:
-        temp3textsDf = pd.read_csv("adjusted_texts.csv")
-        temp2wordsDf = pd.read_csv("adjusted_words.csv")
-        visualizer = Visualizer(temp3textsDf, temp2wordsDf)
+        textsDf = pd.read_csv("texts.csv")
+        wordsDf = pd.read_csv("words.csv")
+        visualizer = Visualizer(textsDf, wordsDf)
     except Exception as e:
         print(f"Error loading data for Visualizer: {e}")
         return
 
-    # Launch GUI with Visualizer
     try:
         guiHandler = GUIHandler(visualizer)
         guiHandler.launchGUI()
