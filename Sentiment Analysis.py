@@ -351,6 +351,7 @@ class ToneAdjuster:
             print("Likes or comments column missing. Adjusted impact cannot be calculated.")
 
         return df
+
 class PoliticalScoreProcessor:
     def __init__(self, sentimentDataset, outputTextsPath):
         self.sentimentDataset = sentimentDataset  # Use sentiment_dataset directly
@@ -415,18 +416,30 @@ class Visualizer:
         self.wordsDf = wordsDf
 
     def groupAndSummarizeData(self, selection, sortBy):
-        if selection == 'words':
-            grouped = self.wordsDf.groupby('word', as_index=False).sum()
-            grouped = grouped[['word', sortBy]].sort_values(by=sortBy, ascending=False)
-        elif selection == 'texts':
-            grouped = self.textsDf.groupby('text', as_index=False).sum()
-            grouped = grouped[['text', sortBy]].sort_values(by=sortBy, ascending=False)
+        """
+        Group and summarize the data based on the user's selection and sort criteria.
+        """
+        if selection in ['words', 'texts']:
+            grouped = self.wordsDf.groupby('word', as_index=False).sum() if selection == 'words' else self.textsDf.groupby('text', as_index=False).sum()
+            grouped = grouped[[selection[:-1], sortBy]].sort_values(by=sortBy, ascending=False)
+        elif selection in ['agegroup', 'country', 'time', 'userid']:
+            if selection in self.textsDf.columns:
+                grouped = self.textsDf.groupby(selection, as_index=False).sum()
+                grouped = grouped[[selection, sortBy]].sort_values(by=sortBy, ascending=False)
+            else:
+                print(f"Column '{selection}' not found in the dataset.")
+                return pd.DataFrame()
         else:
-            grouped = self.textsDf.groupby(selection, as_index=False).sum()
-            grouped = grouped[[selection, sortBy]].sort_values(by=sortBy, ascending=False)
+            print(f"Selection '{selection}' not found in data columns.")
+            return pd.DataFrame()
+
         return grouped
 
+
     def sliceData(self, df, threshold, countVal):
+        """
+        Slice the data based on the specified threshold and count.
+        """
         if threshold == 'Highest':
             return df.head(countVal)
         elif threshold == 'Lowest':
@@ -438,24 +451,39 @@ class Visualizer:
             dfBottom = df.tail(halfN)
             return pd.concat([dfTop, dfBottom])
         else:
-            return df.head(countVal)
+            print(f"Unknown threshold: {threshold}")
+            return pd.DataFrame()
 
     def plotData(self, df, column, graphType, selection, sortBy, actualCount):
+        """
+        Plot the data based on user specifications.
+        """
         plt.figure(figsize=(10, 6))
-        if graphType == 'Bar':
-            plt.bar(df.iloc[:, 0].astype(str), df[column])
-        elif graphType == 'Line':
-            plt.plot(df.iloc[:, 0].astype(str), df[column], marker='o')
-        elif graphType == 'Pie':
-            plt.pie(df[column], labels=df.iloc[:, 0].astype(str), autopct='%1.1f%%')
-        plt.xticks(rotation=45, ha='right')
-        plotTitle = f"Top {actualCount} {selection} by {sortBy} ({column})"
-        plt.title(plotTitle)
-        if graphType != 'Pie':
-            plt.ylabel(column.capitalize())
-            plt.xlabel(selection.capitalize() if selection not in ['words', 'texts'] else selection.capitalize())
-        plt.tight_layout()
-        plt.show()
+
+        try:
+            if graphType == 'Bar':
+                plt.bar(df.iloc[:, 0].astype(str), df[column])
+            elif graphType == 'Line':
+                plt.plot(df.iloc[:, 0].astype(str), df[column], marker='o')
+            elif graphType == 'Pie':
+                plt.pie(df[column], labels=df.iloc[:, 0].astype(str), autopct='%1.1f%%')
+            else:
+                print(f"Graph type '{graphType}' not recognized. Defaulting to Bar chart.")
+                plt.bar(df.iloc[:, 0].astype(str), df[column])
+
+            plt.xticks(rotation=45, ha='right')
+            plotTitle = f"Top {actualCount} {selection} by {sortBy} ({column})"
+            plt.title(plotTitle)
+
+            if graphType != 'Pie':
+                plt.ylabel(column.capitalize())
+                plt.xlabel(selection.capitalize() if selection not in ['words', 'texts'] else selection.capitalize())
+
+            plt.tight_layout()
+            plt.show()
+
+        except Exception as e:
+            print(f"Error while plotting data: {e}")
 
 class GUIHandler:
     def __init__(self, visualizer):
@@ -466,7 +494,40 @@ class GUIHandler:
         self.countVal = None
         self.graphType = None
 
+    def loadDynamicColumns(self, selection):
+        """
+        Dynamically load column names based on the user's selection.
+        """
+        if selection in ['texts', 'words']:
+            filePath = 'adjusted_texts.csv' if selection == 'texts' else 'adjusted_words.csv'
+        elif selection in ['agegroup', 'country', 'time', 'userid']:
+            filePath = 'adjusted_texts.csv'  # Assuming these columns are in the same file as `texts`.
+        else:
+            print(f"Dynamic columns not applicable for selection: {selection}")
+            return []
+
+        try:
+            data = pd.read_csv(filePath)
+            return list(data.columns)
+        except Exception as e:
+            print(f"Error loading columns for {selection}: {e}")
+            return []
+
+    def updateSortByOptions(self, event, sortByMenu, selectionVar):
+        """
+        Update the Sort By dropdown options based on the selected data type.
+        """
+        selection = selectionVar.get()
+        columns = self.loadDynamicColumns(selection)
+        if columns:
+            sortByMenu["values"] = columns
+        else:
+            sortByMenu["values"] = []
+
     def onSubmit(self, selectionVar, sortByVar, thresholdVar, countVar, graphTypeVar):
+        """
+        Handle the logic when the Submit button is clicked.
+        """
         self.selection = selectionVar.get()
         self.sortBy = sortByVar.get()
         self.threshold = thresholdVar.get()
@@ -490,6 +551,9 @@ class GUIHandler:
             self.visualizer.plotData(dfSliced, self.sortBy, self.graphType, self.selection, self.sortBy, actualCount)
 
     def launchGUI(self):
+        """
+        Launch the GUI for user interaction.
+        """
         root = tk.Tk()
         root.title("Data Selection")
         root.resizable(False, False)
@@ -508,6 +572,9 @@ class GUIHandler:
         sortByMenu = ttk.Combobox(root, textvariable=sortByVar, values=['impact', 'tone', 'likes', 'comments', 'frequency'], state="readonly")
         sortByMenu.pack()
 
+        # Bind event to update Sort By options dynamically
+        dataTypeMenu.bind("<<ComboboxSelected>>", lambda event: self.updateSortByOptions(event, sortByMenu, selectionVar))
+
         tk.Label(root, text="Threshold:").pack()
         thresholdMenu = ttk.Combobox(root, textvariable=thresholdVar, values=['Highest', 'Lowest', 'Extremes'], state="readonly")
         thresholdMenu.pack()
@@ -517,8 +584,14 @@ class GUIHandler:
         countEntry.pack()
 
         tk.Label(root, text="Select Graph Type:").pack()
-        graphTypeMenu = ttk.Combobox(root, textvariable=graphTypeVar, values=['Bar', 'Line', 'Pie'], state="readonly")
+        graphTypeMenu = ttk.Combobox(
+            root,
+            textvariable=graphTypeVar,
+            values=['Bar', 'Line', 'Pie'],  # Most common graph types
+            state="readonly"
+        )
         graphTypeMenu.pack()
+
 
         tk.Button(root, text="Submit", command=lambda: self.onSubmit(selectionVar, sortByVar, thresholdVar, countVar, graphTypeVar)).pack()
 
@@ -699,6 +772,7 @@ def main():
                 "shock": ["surprise", "fear", "disgust"],
                 "satisfaction": ["relief", "joy", "approval"]
                 }
+
         )
         complexEmotionProcessor.process()
     except Exception as e:
@@ -716,7 +790,7 @@ def main():
     except Exception as e:
         print(f"Error in PoliticalScoreProcessor: {e}")
         return
-    
+
     positiveEmotions = [
         "joy", "approval", "admiration", "optimism", "caring", "relief", "gratitude", "amusement", "pride",
         "excitement", "desire", "curiosity", "emotion_compassion", "emotion_elation", "emotion_affection",
@@ -744,6 +818,7 @@ def main():
         "emotion_embarrassment", "emotion_grief", "emotion_remorse"
     ]
 
+    # Tone Adjustment Step for Sentences
 
     # Tone Adjustment Step for Texts
     try:
@@ -769,6 +844,23 @@ def main():
         print("Adjusted words saved to 'adjusted_words.csv'.")
     except Exception as e:
         print(f"Error applying tone adjustments for words: {e}")
+
+    # Initialize Visualizer with adjusted data
+    try:
+        textsDf = pd.read_csv("adjusted_texts.csv")
+        wordsDf = pd.read_csv("adjusted_words.csv")
+        visualizer = Visualizer(textsDf, wordsDf)
+    except Exception as e:
+        print(f"Error loading data for Visualizer: {e}")
+        return
+
+    # Launch GUI with Visualizer
+    try:
+        guiHandler = GUIHandler(visualizer)
+        guiHandler.launchGUI()
+    except Exception as e:
+        print(f"Error launching GUI: {e}")
+        return
 
     print("Pipeline completed successfully.")
 
