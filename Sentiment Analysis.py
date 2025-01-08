@@ -119,7 +119,7 @@ class FileHandler:
 
     @staticmethod
     def cleanTempFiles():
-        tempFiles = ['temp1texts.csv', 'temp1words.csv', 'temp2texts.csv', 'temp3texts.csv', 'temp2words.csv']
+        tempFiles = ['temp1texts.csv', 'temp1words.csv', 'temp2texts.csv', 'temp3texts.csv', 'temp4texts.csv', 'temp2words.csv']
         for file in tempFiles:
             try:
                 if os.path.exists(file):
@@ -387,6 +387,84 @@ class PoliticalScoreProcessor:
 
         self.sentimentDataset.to_csv(self.outputTextsPath, index=False)
         print("Political scores processing completed.")
+
+class ParameterImpactProcessor:
+    def __init__(self, inputFilePath, outputFilePath, modelContextFile, parameters):
+        self.inputFilePath = inputFilePath
+        self.outputFilePath = outputFilePath
+        self.modelContextFile = modelContextFile
+        self.parameters = parameters
+
+    def processParameters(self):
+        # Load model context
+        with open(self.modelContextFile, "r") as file:
+            sample_context = file.read()
+
+        # Read input data
+        try:
+            df = pd.read_csv(self.inputFilePath)
+        except Exception as e:
+            print(f"Error loading input file: {e}")
+            return
+
+        # Initialize result storage
+        processedData = []
+
+        for index, row in df.iterrows():
+            userInput = row.get("text", "")
+            likes = int(row.get("likes", 0))
+            comments = int(row.get("comments", 0))
+
+            if not userInput:
+                print(f"Skipping empty row at index {index}.")
+                continue
+
+            prompt = f"Based on the sample scores by different parameters provided in sample_context: {sample_context}, evaluate the following statements. For each parameter ({', '.join(self.parameters)}), provide a score in the format 'Parameter: Score' Evaluate the provided statement strictly in terms of the listed parameters. Provide only the parameter name followed by its score in the format 'Parameter: Score'. As in the 'sample_context', try to keep the scores as float between -1 and 1. If the subject of the text is objects such as materials, academic subjects,food the scores should be between 0.Evaluate the provided statement strictly in terms of the listed parameters. For each parameter, provide only the parameter name followed by its score in the format Parameter: Score. If the subject of the text is inanimate objects such as materials, academic subjects, or food, assign a score of 0 to all parameters, as these categories are not applicable for judgment under the given parameters. If the statement refers to people, behaviors, or actions, evaluate the parameters appropriately based on the context. Ensure that all scores are numerical, and avoid using N/A or providing any explanations or additional comments. The output should be concise, listing only the parameter names and their corresponding numerical scores. For parameters marked as N/A, assign a score of 0. Do not include any explanations or additional comments. Instead of N/A, give 0. Give output for all the parameters, and all the scores must and must be between -1 and 1 as shown in the sample"
+
+            try:
+                response = chat(
+                    model="llama3",
+                    messages=[{"role": "user", "content": prompt}]
+                )
+
+                scores = response["message"]["content"].split("\n")
+                paramScores = {param: 0 for param in self.parameters}
+
+                for line in scores:
+                    if ":" in line:
+                        param, value = line.split(":")
+                        param = param.strip()
+                        try:
+                            value = float(value.strip())
+                        except ValueError:
+                            value = 0
+
+                        if param in paramScores:
+                            paramScores[param] = value
+
+                # Calculate impacts
+                for param in self.parameters:
+                    impactCol = f"impact_{param}"
+                    paramScores[impactCol] = paramScores[param] * ((likes // 10) + comments)
+
+                # Append to processed data
+                paramScores.update({"text": userInput, "likes": likes, "comments": comments})
+                processedData.append(paramScores)
+
+            except Exception as e:
+                print(f"Error processing row {index}: {e}")
+                # Handle completely erroneous output by assigning 0 to all parameters
+                processedData.append({**{param: 0 for param in self.parameters},
+                                      **{f"impact_{param}": 0 for param in self.parameters},
+                                      "text": userInput, "likes": likes, "comments": comments})
+
+        # Save to output file
+        try:
+            outputDf = pd.DataFrame(processedData)
+            outputDf.to_csv(self.outputFilePath, index=False)
+            print(f"Processed data saved to {self.outputFilePath}.")
+        except Exception as e:
+            print(f"Error saving output file: {e}")
 
 class Visualizer:
     def __init__(self, textsDf, wordsDf):
@@ -727,10 +805,26 @@ def main():
         toneAdjuster = ToneAdjuster(positiveEmotions, negativeEmotions)
         adjustedTextsDf = toneAdjuster.adjustToneAndImpact(textsDf)
 
-        adjustedTextsDf.to_csv("texts.csv", index=False)
-        print("Adjusted texts saved to 'texts.csv'.")
+        adjustedTextsDf.to_csv("temp4texts.csv", index=False)
+        print("Adjusted texts saved to 'temp4texts.csv'.")
     except Exception as e:
         print(f"Error applying tone adjustments for texts: {e}")
+    
+        # Integrate ParameterImpactProcessor for new functionality
+    try:
+        print("Processing parameters and impacts...")
+        parameterProcessor = ParameterImpactProcessor(
+            inputFilePath="temp4texts.csv",
+            outputFilePath="texts.csv",
+            modelContextFile="Flagging Prompts.txt",
+            parameters=[
+                "Ableist", "Abusive", "Ageist"
+            ]
+        )
+        parameterProcessor.processParameters()
+        print("Parameter impacts processed and saved to 'texts.csv'.")
+    except Exception as e:
+        print(f"Error processing parameters: {e}")
 
     try:
         print("Applying tone adjustments for words...")
