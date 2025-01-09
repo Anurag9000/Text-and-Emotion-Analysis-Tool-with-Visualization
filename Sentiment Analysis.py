@@ -357,7 +357,7 @@ class PoliticalScoreProcessor:
                 formatted_input = f"{instruction_text} Text: {text}"
 
                 response = chat(
-                    model="llama3",
+                    model="llama3.2",
                     messages=[{"role": "user", "content": formatted_input}]
                 )
 
@@ -429,6 +429,7 @@ class ParameterImpactProcessor:
                 )
 
                 response_lines = response["message"]["content"].split("\n")
+                print(response_lines)
                 paramScores = {param: 0 for param in self.parameters}
 
                 for line in response_lines:
@@ -436,6 +437,7 @@ class ParameterImpactProcessor:
                         try:
                             param, value = line.split(":", 1)
                             param = param.strip()
+                            param = re.sub(r"#", "", param)
                             value = float(value.strip())
                             if param in paramScores:
                                 paramScores[param] = value
@@ -813,17 +815,7 @@ def main():
             inputFilePath="temp3texts.csv",
             outputFilePath="texts.csv",
             modelContextFile="Flagging Prompts.txt",
-            parameters = [
-                "ableist", "abusive", "ageist", "aggressive", "alienating", "antisemitic", "belittling", "belligerent", 
-                "bullying", "caustic", "classist", "condescending", "containing slurs", "contemptful", "defamatory", 
-                "degrading", "demeaning", "demoralizing", "derisive", "derogatory", "despising", "destructive", 
-                "discriminatory", "disparaging", "disturbing", "enraging", "ethnocentric", "exclusionary", "harassing", 
-                "harmful", "hatespeech", "homophobic", "hostile", "hurtful", "incendiary", "inflammatory", "insulting", 
-                "intimidating", "intolerable", "intolerant", "islamophobic", "malicious", "marginalizing", "misogynistic", 
-                "mocking", "nasty", "obscene", "offensive", "oppressive", "overbearing", "pejorative", "prejudiced", 
-                "profane", "racist", "sarcastic", "scornful", "sexist", "slanderous", "spiteful", "threatening", "toxic", 
-                "transphobic", "traumatizing", "vindictive", "vindictive", "vulglar", "xenophobic"
-            ]
+            parameters = ['Ableist', 'Abusive', 'Ageist', 'Aggressive', 'Alienating', 'Antisemitic', 'Belittling', 'Belligerent', 'Bullying', 'Caustic', 'Classist', 'Condescending', 'Containing slurs', 'Contemptful', 'Defamatory', 'Degrading', 'Demeaning', 'Demoralizing', 'Derisive', 'Derogatory', 'Despising', 'Destructive', 'Discriminatory', 'Disparaging', 'Disturbing', 'Enraging', 'Ethnocentric', 'Exclusionary', 'Harassing', 'Harmful', 'Hatespeech', 'Homophobic', 'Hostile', 'Hurtful', 'Incendiary', 'Inflammatory', 'Insulting', 'Intimidating', 'Intolerable', 'Intolerant', 'Islamophobic', 'Malicious', 'Marginalizing', 'Misogynistic', 'Mocking', 'Nasty', 'Obscene', 'Offensive', 'Oppressive', 'Overbearing', 'Pejorative', 'Prejudiced', 'Profane', 'Racist', 'Sarcastic', 'Scornful', 'Sexist', 'Slanderous', 'Spiteful', 'Threatening', 'Toxic', 'Transphobic', 'Traumatizing', 'Vindictive', 'Vindictive', 'Vulglar', 'Xenophobic']
 
         )
         parameterProcessor.processParameters()
