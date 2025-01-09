@@ -459,6 +459,14 @@ class ParameterImpactProcessor:
 
         try:
             newData = pd.DataFrame(processedData)
+
+            # Add toxicity_index and toxicity_impact columns
+            toxicityColumns = self.parameters
+            toxicityImpactColumns = [f"impact_{param}" for param in self.parameters]
+
+            newData["toxicity_index"] = newData[toxicityColumns].sum(axis=1)
+            newData["toxicity_impact"] = newData[toxicityImpactColumns].sum(axis=1)
+            
             mergedData = pd.merge(existingData, newData, on="text", how="left")
             mergedData.to_csv(self.outputFilePath, index=False)
             print(f"Processed data saved to {self.outputFilePath}.")
