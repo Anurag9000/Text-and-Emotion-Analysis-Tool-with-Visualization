@@ -1,4 +1,4 @@
-filtered_emotions = {
+filteredEmotions = {
     "compassion": ["caring", "sadness"],
     "elation": ["joy", "excitement"],
     "affection": ["love", "approval"],
@@ -65,3 +65,55 @@ filtered_emotions = {
     "shock": ["surprise", "fear", "disgust"],
     "satisfaction": ["relief", "joy", "approval"]
     }
+
+
+
+
+
+
+
+
+
+positiveEmotions = [
+    "joy", "approval", "admiration", "optimism", "caring", "relief", "gratitude", "amusement", "pride",
+    "excitement", "desire", "curiosity", "emotion_compassion", "emotion_elation", "emotion_affection",
+    "emotion_contentment", "emotion_playfulness", "emotion_empathy", "emotion_warmth", "emotion_triumph",
+    "emotion_nostalgia", "emotion_hopefulness", "emotion_bliss", "emotion_fascination", "emotion_passion",
+    "emotion_delight", "emotion_amazement", "emotion_zeal", "emotion_reverence", "emotion_infatuation",
+    "emotion_composure", "emotion_ecstasy", "emotion_anticipation", "emotion_serendipity", "emotion_acceptance",
+    "emotion_cheerfulness", "emotion_eagerness", "emotion_clarity", "emotion_gratefulness",
+    "emotion_joy", "emotion_approval", "emotion_excitement", "emotion_admiration", "emotion_caring",
+    "emotion_amusement", "emotion_gratitude", "emotion_optimism", "emotion_pride", "emotion_relief"
+]
+
+negativeEmotions = [
+    "surprise", "sadness", "neutral", "fear", "anger", "disgust", "realization", "disapproval", "annoyance",
+    "disappointment", "confusion", "nervousness", "embarrassment", "remorse", "love", "grief",
+    "emotion_frustration", "emotion_shame", "emotion_regret", "emotion_guilt", "emotion_loneliness",
+    "emotion_disdain", "emotion_skepticism", "emotion_uncertainty", "emotion_reluctance", "emotion_apathy",
+    "emotion_bitterness", "emotion_agitation", "emotion_yearning", "emotion_sorrow", "emotion_trepidation",
+    "emotion_complacency", "emotion_disillusionment", "emotion_resignation", "emotion_hostility",
+    "emotion_disorientation", "emotion_compunction", "emotion_humility", "emotion_serenity", "emotion_reconciliation",
+    "emotion_alienation", "emotion_exultation", "emotion_affirmation", "emotion_resentment", "emotion_hesitation",
+    "emotion_grievance", "emotion_outrage", "emotion_pity", "emotion_shock", "emotion_satisfaction",
+    "emotion_surprise", "emotion_sadness", "emotion_fear", "emotion_anger", "emotion_disgust",
+    "emotion_disapproval", "emotion_disappointment", "emotion_confusion", "emotion_nervousness",
+    "emotion_embarrassment", "emotion_grief", "emotion_remorse"
+]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+parameters = ['Ableist', 'Abusive', 'Ageist', 'Aggressive', 'Alienating', 'Antisemitic', 'Belittling', 'Belligerent', 'Bullying', 'Caustic', 'Classist', 'Condescending', 'Containing slurs', 'Contemptful', 'Defamatory', 'Degrading', 'Demeaning', 'Demoralizing', 'Derisive', 'Derogatory', 'Despising', 'Destructive', 'Discriminatory', 'Disparaging', 'Disturbing', 'Enraging', 'Ethnocentric', 'Exclusionary', 'Harassing', 'Harmful', 'Hatespeech', 'Homophobic', 'Hostile', 'Hurtful', 'Incendiary', 'Inflammatory', 'Insulting', 'Intimidating', 'Intolerable', 'Intolerant', 'Islamophobic', 'Malicious', 'Marginalizing', 'Misogynistic', 'Mocking', 'Nasty', 'Obscene', 'Offensive', 'Oppressive', 'Overbearing', 'Pejorative', 'Prejudiced', 'Profane', 'Racist', 'Sarcastic', 'Scornful', 'Sexist', 'Slanderous', 'Spiteful', 'Threatening', 'Toxic', 'Transphobic', 'Traumatizing', 'Vindictive', 'Vindictive', 'Vulglar', 'Xenophobic']
