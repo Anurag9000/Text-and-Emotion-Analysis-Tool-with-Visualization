@@ -466,7 +466,7 @@ class ParameterImpactProcessor:
 
             newData["toxicity_index"] = newData[toxicityColumns].sum(axis=1)
             newData["toxicity_impact"] = newData[toxicityImpactColumns].sum(axis=1)
-            
+
             mergedData = pd.merge(existingData, newData, on="text", how="left")
             mergedData.to_csv(self.outputFilePath, index=False)
             print(f"Processed data saved to {self.outputFilePath}.")
@@ -638,7 +638,56 @@ class GUIHandler:
 
         root.mainloop()
 
+def cleanData(filePath, outputFilePath):
+    try:
+        # Load the dataset
+        data = pd.read_csv(filePath)
+        print(f"Dataset loaded successfully. Shape: {data.shape}")
+    except FileNotFoundError:
+        print(f"Error: File not found at {filePath}.")
+        return
+    except pd.errors.EmptyDataError:
+        print(f"Error: Dataset at {filePath} is empty.")
+        return
+    except Exception as e:
+        print(f"Unexpected error loading dataset: {e}")
+        return
+
+    # Detect and fill missing values
+    print("Checking for missing values...")
+    missingCount = data.isnull().sum()
+    print("Missing values before cleaning:")
+    print(missingCount)
+
+    for column in data.columns:
+        if data[column].dtype == "object":  # String or object columns
+            data[column] = data[column].fillna("None")
+        else:  # Numeric columns
+            data[column] = data[column].fillna(0)
+
+    print("Missing values after cleaning:")
+    print(data.isnull().sum())
+
+    # Save the cleaned dataset
+    try:
+        data.to_csv(outputFilePath, index=False)
+        print(f"Cleaned dataset saved to {outputFilePath}.")
+    except Exception as e:
+        print(f"Error saving cleaned dataset: {e}")
+
 def main():
+    try:
+        cleanData("sentiment_dataset.csv", "cleaned_dataset.csv")  # Clean data
+    except FileNotFoundError:
+        print("Error: 'sentiment_dataset.csv' not found. Ensure the file is in the correct directory.")
+        return
+    except pd.errors.EmptyDataError:
+        print("Error: 'cleaned_dataset.csv' is empty. Provide a valid dataset.")
+        return
+    except Exception as e:
+        print(f"Unexpected error loading dataset: {e}")
+        return
+    
     try:
         allStopwords = DataProcessor.getAllStopwords()
     except Exception as e:
@@ -658,12 +707,12 @@ def main():
         return
 
     try:
-        hf_dataset = Dataset.from_csv('sentiment_dataset.csv')
+        hf_dataset = Dataset.from_csv('cleaned_dataset.csv')
     except FileNotFoundError:
-        print("Error: 'sentiment_dataset.csv' not found. Ensure the file is in the correct directory.")
+        print("Error: 'cleaned_dataset.csv' not found. Ensure the file is in the correct directory.")
         return
     except pd.errors.EmptyDataError:
-        print("Error: 'sentiment_dataset.csv' is empty. Provide a valid dataset.")
+        print("Error: 'cleaned_dataset.csv' is empty. Provide a valid dataset.")
         return
     except Exception as e:
         print(f"Unexpected error loading dataset: {e}")
