@@ -12,6 +12,7 @@ from datasets import Dataset
 import pandas as pd
 import os
 import torch
+import sqlite3 
 
 class FileHandler:
     def __init__(self, dataset, stopwords, emotions, dataProcessor):
@@ -72,6 +73,8 @@ class FileHandler:
         def processWords(wordData, row):
             words = re.findall(r'\b\w+\b', row['text'].lower())  # Tokenize and normalize case
             for word in words:
+                if word in self.stopwords:
+                    continue  # Skip stopwords
                 try:
                     wordEmotionScores = self.dataProcessor.extractEmotions({"text": [word]})
 
@@ -362,7 +365,6 @@ class PoliticalScoreProcessor:
                 )
 
                 scores = response['message']['content'].split(", ")
-                print(scores)
                 economicScore = float(scores[0])
                 socialScore = float(scores[1])
 
@@ -420,7 +422,7 @@ class ParameterImpactProcessor:
                 print(f"Skipping empty row at index {index}.")
                 continue
 
-            prompt = f"Based on the sample scores by different parameters provided in sample_context: {sample_context}, evaluate the following statement: '{userInput}'. For each parameter ({', '.join(self.parameters)}), provide a score in the format 'Parameter: Score' Evaluate the provided statement strictly in terms of the listed parameters. Provide only the parameter name followed by its score in the format 'Parameter: Score'. As in the 'sample_context', try to keep the scores as float between -1 and 1. If the subject of the text is objects such as materials, academic subjects,food the scores should be between 0.Evaluate the provided statement strictly in terms of the listed parameters. For each parameter, provide only the parameter name followed by its score in the format Parameter: Score. If the subject of the text is inanimate objects such as materials, academic subjects, or food, assign a score of 0 to all parameters, as these categories are not applicable for judgment under the given parameters. If the statement refers to people, behaviors, or actions, evaluate the parameters appropriately based on the context. Ensure that all scores are numerical, and avoid using N/A or providing any explanations or additional comments. The output should be concise, listing only the parameter names and their corresponding numerical scores. For parameters marked as N/A, assign a score of 0. Do not include any explanations or additional comments. Instead of N/A, give 0. Give output for all the parameters, and all the scores must and must be between -1 and 1 as shown in the sample"
+            prompt = f"Based on the sample scores by different parameters provided in sample_context: {sample_context}, evaluate the following statement: '{userInput}'. For each parameter ({', '.join(self.parameters)}), provide a score in strictly the format 'Parameter: Score' Evaluate the provided statement strictly in terms of the listed parameters. Provide only the parameter name followed by its score in the format 'Parameter: Score'. As in the 'sample_context', try to keep the scores as float between -1 and 1. If the subject of the text is objects such as materials, academic subjects,food the scores should be between 0.Evaluate the provided statement strictly in terms of the listed parameters. For each parameter, provide only the parameter name followed by its score in the format Parameter: Score. If the subject of the text is inanimate objects such as materials, academic subjects, or food, assign a score of 0 to all parameters, as these categories are not applicable for judgment under the given parameters. If the statement refers to people, behaviors, or actions, evaluate the parameters appropriately based on the context. Ensure that all scores are numerical, and avoid using N/A or providing any explanations or additional comments. The output should be concise, listing only the parameter names and their corresponding numerical scores. For parameters marked as N/A, assign a score of 0. Do not include any explanations or additional comments. Instead of N/A, give 0. Give output for all the parameters, and all the scores must and must be between -1 and 1 as shown in the sample"
 
             try:
                 response = chat(
@@ -429,7 +431,6 @@ class ParameterImpactProcessor:
                 )
 
                 response_lines = response["message"]["content"].split("\n")
-                print(response_lines)
                 paramScores = {param: 0 for param in self.parameters}
 
                 for line in response_lines:
@@ -472,6 +473,62 @@ class ParameterImpactProcessor:
             print(f"Processed data saved to {self.outputFilePath}.")
         except Exception as e:
             print(f"Error saving output file: {e}")
+
+class DatabaseHandler:
+    def __init__(self, db_path):
+        self.db_path = db_path
+        self.conn = None
+
+    def connect(self):
+        try:
+            self.conn = sqlite3.connect(self.db_path)
+            print(f"Connected to SQLite database at {self.db_path}")
+        except sqlite3.Error as e:
+            print(f"Error connecting to SQLite database: {e}")
+            self.conn = None
+
+    def create_tables(self, texts_columns, words_columns):
+        if not self.conn:
+            print("No connection. Call connect() first.")
+            return
+
+        cursor = self.conn.cursor()
+
+        # Create texts table
+        create_texts_table = f"""
+        CREATE TABLE IF NOT EXISTS texts (
+            {', '.join([f'{col} TEXT' for col in texts_columns])}
+        );
+        """
+        cursor.execute(create_texts_table)
+
+        # Create words table
+        create_words_table = f"""
+        CREATE TABLE IF NOT EXISTS words (
+            {', '.join([f'{col} TEXT' for col in words_columns])}
+        );
+        """
+        cursor.execute(create_words_table)
+
+        self.conn.commit()
+        print("Tables created successfully!")
+
+    def insert_data(self, csv_file, table_name):
+        if not self.conn:
+            print("No connection. Call connect() first.")
+            return
+
+        try:
+            df = pd.read_csv(csv_file)
+            df.to_sql(table_name, self.conn, if_exists='append', index=False)
+            print(f"Data from '{csv_file}' inserted into '{table_name}'.")
+        except Exception as e:
+            print(f"Error inserting data into {table_name}: {e}")
+
+    def close(self):
+        if self.conn:
+            self.conn.close()
+            print("SQLite connection closed.")
 
 class Visualizer:
     def __init__(self, textsDf, wordsDf):
@@ -892,6 +949,30 @@ def main():
         print(f"Error applying tone adjustments for words: {e}")
 
     try:
+        # Initialize DatabaseHandler
+        db_handler = DatabaseHandler('sentiment_analysis.db')
+
+        # Connect to the SQLite database
+        db_handler.connect()
+
+        # Define column names for tables
+        texts_columns = list(pd.read_csv('texts.csv', nrows=0).columns)
+        words_columns = list(pd.read_csv('words.csv', nrows=0).columns)
+
+        # Create tables
+        db_handler.create_tables(texts_columns, words_columns)
+
+        # Insert data into tables from CSV files
+        db_handler.insert_data('texts.csv', 'texts')
+        db_handler.insert_data('words.csv', 'words')
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    finally:
+        db_handler.close()
+
+    try:
         textsDf = pd.read_csv("texts.csv")
         wordsDf = pd.read_csv("words.csv")
         visualizer = Visualizer(textsDf, wordsDf)
@@ -905,7 +986,7 @@ def main():
     except Exception as e:
         print(f"Error launching GUI: {e}")
         return
-
+    
     print("Pipeline completed successfully.")
 
 if __name__ == "__main__":
