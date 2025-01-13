@@ -488,8 +488,11 @@ class DatabaseHandler:
                 host=self.host,
                 user=self.user,
                 password=self.password,
-                database=self.database
             )
+            cursor = self.conn.cursor()
+            cursor.execute(f"DROP DATABASE IF EXISTS {self.database};")
+            cursor.execute(f"CREATE DATABASE {self.database};")
+            self.conn.select_db(f"{self.database}")
             print(f"Connected to MySQL database: {self.database}")
         except pymysql.MySQLError as e:
             print(f"Error connecting to MySQL database: {e}")
