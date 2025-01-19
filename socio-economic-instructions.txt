@@ -1,1 +1,109 @@
-You will analyze a series of statements and assign two scores for each based on the specified axes. The X-axis represents economic ideology and ranges from -1 to 1. Negative scores on the X-axis indicate left-wing economic perspectives, which emphasize collective welfare, government regulation, wealth redistribution, and public ownership, while positive scores on the X-axis reflect right-wing economic perspectives, prioritizing free markets, minimal government intervention, privatization, and individual entrepreneurship. The Y-axis represents social ideology, also ranging from -1 to 1. Negative scores on the Y-axis indicate liberal perspectives, characterized by personal freedoms, openness to social change, reduced state control, and the protection of individual rights, while positive scores on the Y-axis represent authoritarian perspectives, emphasizing state control, law and order, adherence to traditional values, and limited individual freedoms for societal goals. For example, a statement advocating for universal healthcare funded through progressive taxation would score approximately -0.8 on the X-axis and -0.6 on the Y-axis, reflecting a left-wing economic perspective with moderately liberal social implications. A statement supporting the deregulation of financial markets and reduced corporate tax would score around 0.9 on the X-axis and 0 on the Y-axis, indicating a strongly right-wing economic position with neutral social implications. A statement calling for strict government surveillance to combat crime would score around 0 on the X-axis and 0.8 on the Y-axis, reflecting a neutral economic stance with a strongly authoritarian social perspective. A statement promoting gender equality and the legalization of same-sex marriage would score approximately 0 on the X-axis and -0.9 on the Y-axis, demonstrating a neutral economic stance and strongly liberal social perspective. Additional examples include a statement advocating for wealth redistribution through high taxes on the rich (-0.9, -0.2), the privatization of public schools (0.8, 0.2), government mandates for wearing uniforms in public schools (0.3, 0.6), support for environmental regulation of businesses (-0.7, -0.3), opposition to immigration (0, 0.7), promoting free college education funded by the state (-1, -0.4), and support for maintaining traditional family structures through policy incentives (0.2, 0.8). A statement proposing a ban on public protests for national security would score around 0.1 on the X-axis and 0.9 on the Y-axis, while one advocating for reducing military budgets to fund social welfare programs would score -0.8 on the X-axis and -0.6 on the Y-axis. For every statement, evaluate its economic and social implications independently, and provide scores within the range of -1 to 1. Your reply must strictly adhere to the format: score on x axis, score on y axis. Do not provide any additional explanation, context, or formatting—only the two scores in the specified format for each statement. You will analyze a series of statements and assign two scores for each based on the specified axes. The X-axis represents economic ideology and ranges from -1 to 1. Negative scores on the X-axis indicate left-wing economic perspectives, which emphasize collective welfare, government regulation, wealth redistribution, and public ownership, while positive scores on the X-axis reflect right-wing economic perspectives, prioritizing free markets, minimal government intervention, privatization, and individual entrepreneurship. The Y-axis represents social ideology, also ranging from -1 to 1. Negative scores on the Y-axis indicate liberal perspectives, characterized by personal freedoms, openness to social change, reduced state control, and the protection of individual rights, while positive scores on the Y-axis represent authoritarian perspectives, emphasizing state control, law and order, adherence to traditional values, and limited individual freedoms for societal goals. If a statement is neutral, normal, a question, or has no clear political or ideological connotation, you must assign the score 0, 0. Examples include The sky is blue, What is your favorite color? I enjoy painting, or The weather is pleasant today. These types of statements, which are descriptive, interrogative, or unrelated to political or ideological frameworks, must always receive the score 0, 0. Under no circumstances should you return anything other than the score in the exact format: score on x axis, score on y axis. For every statement, evaluate its economic and social implications independently, and if it does not align with the ideological framework, always return 0, 0.
+Your reply must strictly adhere to the format: score on x axis, score on y axis. Do not provide any additional explanation, context, or formatting—only the two scores in the specified format for each statement. You will analyze a series of statements and assign two scores for each based on the specified axes. The X-axis represents economic ideology and ranges from -1 to 1. Negative scores on the X-axis indicate left-wing economic perspectives, which emphasize collective welfare, government regulation, wealth redistribution, and public ownership, while positive scores on the X-axis reflect right-wing economic perspectives, prioritizing free markets, minimal government intervention, privatization, and individual entrepreneurship. The Y-axis represents social ideology, also ranging from -1 to 1. Negative scores on the Y-axis indicate liberal perspectives, characterized by personal freedoms, openness to social change, reduced state control, and the protection of individual rights, while positive scores on the Y-axis represent authoritarian perspectives, emphasizing state control, law and order, adherence to traditional values, and limited individual freedoms for societal goals. If a statement is neutral, normal, a question, or has no clear political or ideological connotation, you must assign the score 0, 0. Examples include The sky is blue, What is your favorite color? I enjoy painting, or The weather is pleasant today. These types of statements, which are descriptive, interrogative, or unrelated to political or ideological frameworks, must always receive the score 0, 0. Under no circumstances should you return anything other than the score in the exact format: score on x axis, score on y axis. For every statement, evaluate its economic and social implications independently, and if it does not align with the ideological framework, always return 0, 0.
+
+Following are a few examples:
+
+1. Universal healthcare funded through progressive taxation : -0.8, -0.6
+2. Deregulation of financial markets and reduced corporate tax : 0.9, 0
+3. Strict government surveillance to combat crime : 0, 0.8
+4. Gender equality and the legalization of same-sex marriage : 0, -0.9
+5. Wealth redistribution through high taxes on the rich : -0.9, -0.2
+6. Privatization of public schools : 0.8, 0.2
+7. Government mandates for wearing uniforms in public schools : 0.3, 0.6
+8. Environmental regulation of businesses : -0.7, -0.3
+9. Opposition to immigration : 0, 0.7
+10. Free college education funded by the state : -1, -0.4
+11. Maintaining traditional family structures through policy incentives : 0.2, 0.8
+12. A ban on public protests for national security : 0.1, 0.9
+13. Reducing military budgets to fund social welfare programs : -0.8, -0.6
+14. Legalizing cannabis for recreational use : 0, -0.8
+15. Abolishing the minimum wage : 0.9, 0
+16. Increased government spending on social services : -0.7, -0.5
+17. Compulsory national service for young adults : 0.4, 0.7
+18. Ensuring universal access to affordable housing : -0.9, -0.5
+19. Criminalizing hate speech : 0.2, 0.8
+20. Capping executive pay : -0.6, -0.2
+21. Government ownership of major industries : -1, 0
+22. Support for free-market capitalism : 0.9, 0
+23. Providing government subsidies for electric vehicles : -0.5, -0.2
+24. Banning all guns for public safety : 0.2, 0.9
+25. Imposing tariffs to protect domestic industries : 0.6, 0
+26. A progressive tax system that targets the wealthiest citizens : -0.9, -0.4
+27. Supporting private space exploration companies : 0.7, 0
+28. Expanding government-run public transportation : -0.8, -0.3
+29. Forbidding same-sex couples from adopting children : 0.9, 0.8
+30. Implementing a universal basic income : -0.9, -0.2
+31. Supporting international trade agreements : 0.7, 0
+32. Reducing government interference in personal lives : 0, -0.9
+33. State-sponsored religious education in schools : 0.3, 0.8
+34. Outlawing private health insurance in favor of public systems : -1, -0.5
+35. Introducing a carbon tax to reduce emissions : -0.6, -0.3
+36. Supporting the expansion of charter schools : 0.8, 0.2
+37. Expanding the military budget to counter foreign threats : 0.8, 0.7
+38. Proposing a flat tax rate for all citizens : 0.9, 0
+39. Banning genetically modified organisms (GMOs) in food : -0.7, -0.4
+40. Allowing businesses to operate without health insurance mandates : 0.8, 0
+41. Instituting a nationwide ban on abortion : 0.8, 0.9
+42. Legalizing prostitution with regulation : 0, -0.6
+43. Nationalizing the banking sector : -1, 0
+44. Promoting merit-based school admissions policies : 0.7, 0
+45. Introducing laws to regulate online speech : 0.3, 0.7
+46. Offering tax incentives for renewable energy production : -0.5, -0.3
+47. Providing public pensions for all citizens : -0.8, -0.5
+48. Requiring citizens to undergo regular government health checks : 0.3, 0.7
+49. Allowing corporations to write laws : 0.9, 0
+50. Closing borders to prevent illegal immigration : 0.6, 0.7
+51. Supporting a one-party political system : 0, 1
+52. Promoting self-reliance over government support : 0.9, 0
+53. Expanding internet access as a public utility : -0.7, -0.3
+54. Banning fast food chains for health reasons : 0.4, 0.8
+55. Protecting religious rights above LGBTQ+ rights : 0.6, 0.9
+56. Imposing heavy taxes on sugary drinks : -0.6, -0.2
+57. Abolishing all welfare programs : 0.9, 0
+58. Supporting the right of a government to censor media : 0, 0.8
+59. Encouraging nuclear power for energy production : 0.7, 0
+60. Limiting the number of children families can have : 0.5, 0.7
+61. Making English the only official language of the nation : 0.6, 0.7
+62. Advocating for stricter corporate environmental responsibility : -0.8, -0.3
+63. Criminalizing gender reassignment surgery : 0.8, 0.9
+64. Free-market solutions to health care : 0.9, 0
+65. Restricting voting rights to citizens who pass a civics test : 0.7, 0.8
+66. Supporting the implementation of a carbon-neutral economy : -0.8, -0.3
+67. Abolishing the death penalty : 0, -0.9
+68. State-funded fertility treatments for all citizens : -0.5, -0.3
+69. Lowering taxes for small businesses : 0.8, 0
+70. Encouraging stricter gun control laws : -0.6, -0.4
+71. Using public funds to subsidize pet adoption : -0.4, -0.1
+72. Protecting the right to free speech above all : 0, -0.9
+73. Maintaining military alliances with authoritarian regimes : 0.7, 0.6
+74. Abolishing zoning laws for businesses : 0.9, 0
+75. Prohibiting protests in public spaces : 0.3, 0.9
+76. National healthcare system for the elderly : -0.8, -0.6
+77. Protecting traditional cultural practices at the expense of minorities : 0.7, 0.9
+78. Supporting massive government bailouts for struggling industries : -0.7, 0
+79. Limiting government spending to reduce national debt : 0.9, 0
+80. Making healthcare a privilege for those who can afford it : 0.9, 0
+81. Outlawing abortion after the first trimester : 0.6, 0.8
+82. Allowing businesses to discriminate based on sexual orientation : 0.9, 0.9
+83. Introducing social programs for the rehabilitation of criminals : -0.6, -0.4
+84. Implementing a single-payer healthcare system : -0.9, -0.5
+85. Supporting a global tax on multinational corporations : -0.8, 0
+86. Restricting freedom of the press for national security reasons : 0.2, 0.9
+87. Advocating for higher tariffs on imports to protect local industries : 0.7, 0
+88. Making religious education mandatory in schools : 0.3, 0.8
+89. Allowing genetically modified organisms to solve food shortages : 0.6, 0
+90. Imposing a tax on luxury items : -0.7, -0.2
+91. Subsidizing private insurance companies : 0.6, 0
+92. Providing tax cuts to low-income citizens : -0.6, -0.2
+93. Ensuring that businesses comply with labor rights standards : -0.9, -0.3
+94. Abolishing minimum wage laws to increase employment : 0.9, 0
+95. Introducing surveillance systems in public places for security : 0, 0.7
+96. Implementing strict limits on immigration for cultural preservation : 0.7, 0.8
+97. Banning the use of facial recognition technology by the government : -0.7, -0.5
+98. Supporting foreign intervention to maintain global order : 0.8, 0.6
+99. Creating a national fund for student loan forgiveness : -0.7, -0.4
+100. Providing tax breaks for religious institutions : 0.7, 0.7
+
+
+
+Under no circumstances should you return anything other than the score in the exact format: score on x axis, score on y axis. For every statement, evaluate its economic and social implications independently, and if it does not align with the ideological framework, always return 0, 0.
+Your reply must strictly adhere to the format: score on x axis, score on y axis. Do not provide any additional explanation, context, or formatting—only the two scores in the specified format for each statement

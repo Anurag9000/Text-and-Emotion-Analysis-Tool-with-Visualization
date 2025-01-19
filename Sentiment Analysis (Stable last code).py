@@ -13,15 +13,6 @@ import pandas as pd
 import os
 import torch
 import pymysql
-nlp = spacy.load("en_core_web_sm")
-
-## NOTE TO SELF: WORDS.CSV AND WORDS TABLE IN DATABASE ARE CREATED FOR THE FOLLOWING REASON:
-# 1: PROCESSING A LARGE ENOUGH TEXT SAMPLES WOULD GENERATE ALMOST ALL THE MOST COMMONLY USED WORDS IN CONTENT
-# 2: DEPENDING ON THE SCORES AND RATINGS OF THE LEMMATIZED WORDS; OTHER CONTENT CAN BE SCANNED AGAINST THIS AND RATED BY THE WORDS USED IN THE CONTENT;
-# 3: CONTENT WITH MORE POSITIVE WORDS CAN BE RATED CHILD FRIENDLY AND NEGATIVE CONNOTATION WORDS CAN BE CENSORED BY THE PLATFORM OR RESTRICTED
-# 4: GENERATING A LARGE ENOUGH DATASET FOR INVIDUAL ANNOTATED WORDS WOULD SIMPLIFY FURTHER TEXT PROCESSING AS INSTEAD OF PASSING THE TEXT THROUGH LLMS THE SUM OF SCORES OF WORDS USED IN IT CAN BE USED INSTEAD
-# 5: THIS WOULD BE MUCH FASTER AND CHEAPER REQUIRING MUCH LESS RESOURCES AND SIMPLE PROCESS AND A GOOD ESTIMATE OF THE TONE OF THE TEXT
-# 6: BUT MAINLY IT CAN BE USED TO MONITOR AND RESTRICT/CENSOR CONTENT BASED ON THE SEVERE NEGATIVE WORDS USED
 
 class FileHandler:
     def __init__(self, dataset, stopwords, emotions, dataProcessor):
@@ -79,25 +70,16 @@ class FileHandler:
         dataset.to_csv('temp1texts.csv', index=False)  # Save final processed file as texts.csv
 
     def createWordsCsv(self):
-        def processWords(wordData, variationMap, row):
-            words = re.findall(r'\b\w+\b', row['text'].lower())  # Extract non-lemmatized words
-            lemmatizedWords = [nlp(word)[0].lemma_ for word in words]  # Generate lemmatized words
-            
-            for lemmatizedWord, originalWord in zip(lemmatizedWords, words):
-                if lemmatizedWord in self.stopwords:
+        def processWords(wordData, row):
+            words = re.findall(r'\b\w+\b', row['text'].lower())  # Tokenize and normalize case
+            for word in words:
+                if word in self.stopwords:
                     continue  # Skip stopwords
-                
                 try:
-                    # Track non-lemmatized variations for the lemmatized word
-                    if lemmatizedWord not in variationMap:
-                        variationMap[lemmatizedWord] = set()
-                    variationMap[lemmatizedWord].add(originalWord)
+                    wordEmotionScores = self.dataProcessor.extractEmotions({"text": [word]})
 
-                    # Extract emotions for the original word
-                    wordEmotionScores = self.dataProcessor.extractEmotions({"text": [originalWord]})
-
-                    if lemmatizedWord not in wordData:
-                        wordData[lemmatizedWord] = {
+                    if word not in wordData:
+                        wordData[word] = {
                             'frequency': 0,
                             'likes': 0,
                             'comments': 0,
@@ -107,42 +89,35 @@ class FileHandler:
                             **{f"impact_{emotion}": 0 for emotion in wordEmotionScores.keys()},
                         }
 
-                    # Update scores for the lemmatized word using the original word's context
-                    wordData[lemmatizedWord]['frequency'] += 1
-                    wordData[lemmatizedWord]['likes'] += int(row['likes'])
-                    wordData[lemmatizedWord]['comments'] += int(row['comments'])
-                    wordData[lemmatizedWord]['tone'] += float(SentimentIntensityAnalyzer().polarity_scores(originalWord)['compound'])
-                    wordData[lemmatizedWord]['impact'] += wordData[lemmatizedWord]['tone'] * (
+                    wordData[word]['frequency'] += 1  # Increment global frequency
+                    wordData[word]['likes'] += int(row['likes'])
+                    wordData[word]['comments'] += int(row['comments'])
+                    wordData[word]['tone'] += float(SentimentIntensityAnalyzer().polarity_scores(word)['compound'])
+                    wordData[word]['impact'] += wordData[word]['tone'] * (
                         (int(row['likes']) // 10) + int(row['comments'])
                     )
 
                     for emotion, score in wordEmotionScores.items():
                         score = score[0] if isinstance(score, list) else score
-                        wordData[lemmatizedWord][f"emotion_{emotion}"] += score
-                        wordData[lemmatizedWord][f"impact_{emotion}"] += score * (
+                        wordData[word][f"emotion_{emotion}"] += score
+                        wordData[word][f"impact_{emotion}"] += score * (
                             (int(row['likes']) // 10) + int(row['comments'])
                         )
 
                 except Exception as e:
-                    print(f"Error processing word '{originalWord}': {e}")
+                    print(f"Error processing word '{word}': {e}")
 
         print("Creating 'temp1words.csv'...")
         wordData = {}
-        variationMap = {}  # Dictionary to store non-lemmatized variations for each lemmatized word
 
         for row in self.dataset:
             try:
-                processWords(wordData, variationMap, row)
+                processWords(wordData, row)
             except Exception as e:
                 print(f"Error processing row: {e}")
 
-        # Convert wordData to DataFrame
         wordDf = pd.DataFrame.from_dict(wordData, orient='index').reset_index()
         wordDf.rename(columns={"index": "word"}, inplace=True)
-
-        # Add variations column to the DataFrame
-        wordDf['variations'] = wordDf['word'].apply(lambda w: ', '.join(variationMap.get(w, [])))
-
         wordDf.to_csv('temp1words.csv', index=False)
 
     @staticmethod
@@ -386,10 +361,10 @@ class PoliticalScoreProcessor:
                 likes = int(row.get('likes', 0))
                 comments = int(row.get('comments', 0))
 
-                formatted_input = f"{instruction_text} Your statement is is Text: {text}"
+                formatted_input = f"{instruction_text} Text: {text}"
 
                 response = chat(
-                    model="llama3",
+                    model="llama3.2",
                     messages=[{"role": "user", "content": formatted_input}]
                 )
 
@@ -426,11 +401,11 @@ class ParameterImpactProcessor:
         self.outputFilePath = outputFilePath
         self.modelContextFile = modelContextFile
         self.parameters = parameters
-        
+
     def processParameters(self):
         # Load model context
         with open(self.modelContextFile, "r") as file:
-            context = file.read().replace('\n', ' ')
+            sample_context = file.read()
 
         # Read input data
         try:
@@ -443,7 +418,7 @@ class ParameterImpactProcessor:
         processedData = []
 
         for index, row in existingData.iterrows():
-            userInput = row['text']
+            userInput = row.get("text", "")
             likes = int(row.get("likes", 0))
             comments = int(row.get("comments", 0))
 
@@ -452,7 +427,12 @@ class ParameterImpactProcessor:
                 continue
 
             try:
-                prompt = f"{context} Text: {userInput}"
+                with open("negativity-processing-instructions.txt", 'r') as file:
+                    prompt = file.read().replace('\n', ' ')
+            except Exception as e:
+                print(f"Error reading file: {e}")
+
+            try:
                 response = chat(
                     model="llama3",
                     messages=[{"role": "user", "content": prompt}]
@@ -772,7 +752,6 @@ def cleanData(filePath, outputFilePath):
     except Exception as e:
         print(f"Error saving cleaned dataset: {e}")
 
-
 def main():
     try:
         cleanData("sentiment_dataset.csv", "cleaned_dataset.csv")  # Clean data
@@ -1043,4 +1022,4 @@ def main():
     print("Pipeline completed successfully.")
 
 if __name__ == "__main__":
-    main() 
+    main()
