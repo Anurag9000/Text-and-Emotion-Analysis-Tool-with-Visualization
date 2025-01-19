@@ -15,7 +15,14 @@ import torch
 import pymysql
 nlp = spacy.load("en_core_web_sm")
 
-## NOTE TO SELF: WORDS.CSV AND WORDS TABLE IN DATABASE ARE CREATED FOR THE FOLLOWING REASON:
+## FUTURE SCOPE: DETECT NON ENGLISH NATIVE LANGUAGES WRITTEN IN LATIN SCRIPT OR OTHERWISE
+## MINE EMOTIONS FOR FINETUNINING AND TRAINING MODELS OF LLMS
+# Analyzing
+# Monitoring
+# Moderating content on social media
+# Monitoring mental health of users to send aid
+# FUTURE SCOPE: DETECT NON ENGLISH NATIVE LANGUAGES WRITTEN IN LATIN SCRIPT OR OTHERWISE
+# NOTE TO SELF: WORDS.CSV AND WORDS TABLE IN DATABASE ARE CREATED FOR THE FOLLOWING REASON:
 # 1: PROCESSING A LARGE ENOUGH TEXT SAMPLES WOULD GENERATE ALMOST ALL THE MOST COMMONLY USED WORDS IN CONTENT
 # 2: DEPENDING ON THE SCORES AND RATINGS OF THE LEMMATIZED WORDS; OTHER CONTENT CAN BE SCANNED AGAINST THIS AND RATED BY THE WORDS USED IN THE CONTENT;
 # 3: CONTENT WITH MORE POSITIVE WORDS CAN BE RATED CHILD FRIENDLY AND NEGATIVE CONNOTATION WORDS CAN BE CENSORED BY THE PLATFORM OR RESTRICTED
@@ -79,8 +86,7 @@ class FileHandler:
         dataset = addEmotions(dataset)
         dataset.to_csv('temp1texts.csv', index=False)  # Save final processed file as texts.csv
 
-    @staticmethod
-    def createWordsCsv(inputFilePath, outputFilePath):
+    def createWordsCsv(self, inputFilePath, outputFilePath):
         print("Processing texts to create words.csv...")
 
         try:
@@ -107,12 +113,13 @@ class FileHandler:
             lemmatizedWords = set(token.lemma_ for token in doc if token.is_alpha)
 
             for word in lemmatizedWords:
-                if word not in wordData:
-                    wordData[word] = {col: 0 for col in textsDf.columns if col != "text"}
+                if word not in self.stopwords:
+                    if word not in wordData:
+                        wordData[word] = {col: 0 for col in textsDf.columns if col != "text"}
 
-                for col in textsDf.columns:
-                    if col != "text":
-                        wordData[word][col] += row[col]  # Numeric addition
+                    for col in textsDf.columns:
+                        if col != "text":
+                            wordData[word][col] += row[col]  # Numeric addition
 
         wordDf = pd.DataFrame.from_dict(wordData, orient="index").reset_index()
         wordDf.rename(columns={"index": "word"}, inplace=True)
