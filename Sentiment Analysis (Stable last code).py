@@ -23,6 +23,7 @@ nlp = spacy.load("en_core_web_sm")
 # 5: THIS WOULD BE MUCH FASTER AND CHEAPER REQUIRING MUCH LESS RESOURCES AND SIMPLE PROCESS AND A GOOD ESTIMATE OF THE TONE OF THE TEXT
 # 6: BUT MAINLY IT CAN BE USED TO MONITOR AND RESTRICT/CENSOR CONTENT BASED ON THE SEVERE NEGATIVE WORDS USED
 
+
 class FileHandler:
     def __init__(self, dataset, stopwords, emotions, dataProcessor):
         self.dataset = dataset
@@ -78,76 +79,54 @@ class FileHandler:
         dataset = addEmotions(dataset)
         dataset.to_csv('temp1texts.csv', index=False)  # Save final processed file as texts.csv
 
-    def createWordsCsv(self):
-        def processWords(wordData, variationMap, row):
-            words = re.findall(r'\b\w+\b', row['text'].lower())  # Extract non-lemmatized words
-            lemmatizedWords = [nlp(word)[0].lemma_ for word in words]  # Generate lemmatized words
-            
-            for lemmatizedWord, originalWord in zip(lemmatizedWords, words):
-                if lemmatizedWord in self.stopwords:
-                    continue  # Skip stopwords
-                
-                try:
-                    # Track non-lemmatized variations for the lemmatized word
-                    if lemmatizedWord not in variationMap:
-                        variationMap[lemmatizedWord] = set()
-                    variationMap[lemmatizedWord].add(originalWord)
+    @staticmethod
+    def createWordsCsv(inputFilePath, outputFilePath):
+        print("Processing texts to create words.csv...")
 
-                    # Extract emotions for the original word
-                    wordEmotionScores = self.dataProcessor.extractEmotions({"text": [originalWord]})
+        try:
+            textsDf = pd.read_csv(inputFilePath)
 
-                    if lemmatizedWord not in wordData:
-                        wordData[lemmatizedWord] = {
-                            'frequency': 0,
-                            'likes': 0,
-                            'comments': 0,
-                            'tone': 0,
-                            'impact': 0,
-                            **{f"emotion_{emotion}": 0 for emotion in wordEmotionScores.keys()},
-                            **{f"impact_{emotion}": 0 for emotion in wordEmotionScores.keys()},
-                        }
+            # Ensure all columns except 'text' are numeric
+            for col in textsDf.columns:
+                if col != "text":
+                    textsDf[col] = pd.to_numeric(textsDf[col], errors="coerce")
+        except Exception as e:
+            print(f"Error loading or processing input file: {e}")
+            return
 
-                    # Update scores for the lemmatized word using the original word's context
-                    wordData[lemmatizedWord]['frequency'] += 1
-                    wordData[lemmatizedWord]['likes'] += int(row['likes'])
-                    wordData[lemmatizedWord]['comments'] += int(row['comments'])
-                    wordData[lemmatizedWord]['tone'] += float(SentimentIntensityAnalyzer().polarity_scores(originalWord)['compound'])
-                    wordData[lemmatizedWord]['impact'] += wordData[lemmatizedWord]['tone'] * (
-                        (int(row['likes']) // 10) + int(row['comments'])
-                    )
+        if "text" not in textsDf.columns:
+            print("Input file must contain a 'text' column.")
+            return
 
-                    for emotion, score in wordEmotionScores.items():
-                        score = score[0] if isinstance(score, list) else score
-                        wordData[lemmatizedWord][f"emotion_{emotion}"] += score
-                        wordData[lemmatizedWord][f"impact_{emotion}"] += score * (
-                            (int(row['likes']) // 10) + int(row['comments'])
-                        )
-
-                except Exception as e:
-                    print(f"Error processing word '{originalWord}': {e}")
-
-        print("Creating 'temp1words.csv'...")
         wordData = {}
-        variationMap = {}  # Dictionary to store non-lemmatized variations for each lemmatized word
+        nlp = spacy.load("en_core_web_sm")
 
-        for row in self.dataset:
-            try:
-                processWords(wordData, variationMap, row)
-            except Exception as e:
-                print(f"Error processing row: {e}")
+        for _, row in textsDf.iterrows():
+            text = row['text']
+            doc = nlp(text.lower())
+            lemmatizedWords = set(token.lemma_ for token in doc if token.is_alpha)
 
-        # Convert wordData to DataFrame
-        wordDf = pd.DataFrame.from_dict(wordData, orient='index').reset_index()
+            for word in lemmatizedWords:
+                if word not in wordData:
+                    wordData[word] = {col: 0 for col in textsDf.columns if col != "text"}
+
+                for col in textsDf.columns:
+                    if col != "text":
+                        wordData[word][col] += row[col]  # Numeric addition
+
+        wordDf = pd.DataFrame.from_dict(wordData, orient="index").reset_index()
         wordDf.rename(columns={"index": "word"}, inplace=True)
 
-        # Add variations column to the DataFrame
-        wordDf['variations'] = wordDf['word'].apply(lambda w: ', '.join(variationMap.get(w, [])))
+        try:
+            wordDf.to_csv(outputFilePath, index=False)
+            print(f"Words data saved to {outputFilePath}.")
+        except Exception as e:
+            print(f"Error saving words.csv: {e}")
 
-        wordDf.to_csv('temp1words.csv', index=False)
 
     @staticmethod
     def cleanTempFiles():
-        tempFiles = ['temp1texts.csv', 'temp1words.csv', 'temp2texts.csv', 'temp3texts.csv', 'temp2words.csv']
+        tempFiles = ['temp1texts.csv', 'temp2texts.csv', 'temp3texts.csv']
         for file in tempFiles:
             try:
                 if os.path.exists(file):
@@ -248,10 +227,8 @@ class DataProcessor:
         return emotionImpacts
 
 class ComplexEmotionProcessor:
-    def __init__(self, tempWordsPath, tempTextsPath, outputWordsPath, outputTextsPath, filteredEmotions):
-        self.tempWordsPath = tempWordsPath
+    def __init__(self, tempTextsPath, outputTextsPath, filteredEmotions):
         self.tempTextsPath = tempTextsPath
-        self.outputWordsPath = outputWordsPath
         self.outputTextsPath = outputTextsPath
         self.filteredEmotions = filteredEmotions
 
@@ -287,27 +264,6 @@ class ComplexEmotionProcessor:
                 print(f"Missing complex emotion column for impact: {colName}")
         return df
 
-    def processWords(self):
-        print("Processing complex emotions for words...")
-        wordsDf = pd.read_csv(self.tempWordsPath)
-
-        complexEmotionScores = wordsDf.apply(
-            lambda row: self.calculateComplexEmotions(row, self.filteredEmotions), axis=1
-        )
-
-        complexEmotionDf = pd.DataFrame(complexEmotionScores.tolist())
-
-        overlappingCols = set(wordsDf.columns).intersection(set(complexEmotionDf.columns))
-        if overlappingCols:
-            print(f"Removing overlapping columns: {overlappingCols}")
-            wordsDf = wordsDf.drop(columns=overlappingCols)
-
-        updatedWordsDf = pd.concat([wordsDf, complexEmotionDf], axis=1)
-        updatedWordsDf = self.addImpactColumns(updatedWordsDf, self.filteredEmotions)
-
-        updatedWordsDf.to_csv(self.outputWordsPath, index=False)
-        print(f"Updated words saved to {self.outputWordsPath}")
-
     def processTexts(self):
         print("Processing complex emotions for texts...")
         textsDf = pd.read_csv(self.tempTextsPath)
@@ -322,10 +278,6 @@ class ComplexEmotionProcessor:
 
         updatedTextsDf.to_csv(self.outputTextsPath, index=False)
         print(f"Updated texts saved to {self.outputTextsPath}")
-
-    def process(self):
-        self.processWords()
-        self.processTexts()
 
 class ToneAdjuster:
     def __init__(self, positiveEmotions, negativeEmotions):
@@ -346,23 +298,6 @@ class ToneAdjuster:
             df["adjusted_impact"] = df["adjusted_tone"] * ((df["likes"] // 10) + df["comments"])
         else:
             print("Likes or comments column missing. Impact cannot be recalculated.")
-
-        return df
-
-    def adjustWordsToneAndImpact(self, df):
-        if "tone" not in df.columns:
-            print("Tone column is missing from words DataFrame.")
-            return df
-
-        positiveSum = df[[col for col in self.positiveEmotions if col in df.columns]].sum(axis=1, skipna=True)
-        negativeSum = df[[col for col in self.negativeEmotions if col in df.columns]].sum(axis=1, skipna=True)
-
-        df["adjusted_tone"] = df["tone"] + positiveSum - negativeSum
-
-        if "likes" in df.columns and "comments" in df.columns:
-            df["adjusted_impact"] = df["adjusted_tone"] * ((df["likes"] // 10) + df["comments"])
-        else:
-            print("Likes or comments column missing. Adjusted impact cannot be calculated.")
 
         return df
 
@@ -552,6 +487,7 @@ class DatabaseHandler:
 
         try:
             df = pd.read_csv(csv_file)
+            df.fillna(0, inplace=True)
             cursor = self.conn.cursor()
 
             for _, row in df.iterrows():
@@ -835,12 +771,9 @@ def main():
         try:
             print("Required files missing. Generating all necessary files...")
             fileHandler.createTextsCsv(dataProcessor.calculateToneImpact, dataProcessor)
-            fileHandler.createWordsCsv()
 
             complexEmotionProcessor = ComplexEmotionProcessor(
-                tempWordsPath="temp1words.csv",
                 tempTextsPath="temp1texts.csv",
-                outputWordsPath="temp2words.csv",
                 outputTextsPath="temp2texts.csv",
                 filteredEmotions = {
                     "compassion": ["caring", "sadness"],
@@ -910,7 +843,7 @@ def main():
                     "satisfaction": ["relief", "joy", "approval"]
                     }
             )
-            complexEmotionProcessor.process()
+            complexEmotionProcessor.processTexts()
 
             sentimentDataset = pd.read_csv("temp2texts.csv")
             politicalScoreProcessor = PoliticalScoreProcessor(
@@ -978,16 +911,7 @@ def main():
     except Exception as e:
         print(f"Error processing parameters: {e}")
 
-    try:
-        print("Applying tone adjustments for words...")
-        wordsDf = pd.read_csv("temp2words.csv")
-        toneAdjuster = ToneAdjuster(positiveEmotions, negativeEmotions)
-        adjustedWordsDf = toneAdjuster.adjustWordsToneAndImpact(wordsDf)
-
-        adjustedWordsDf.to_csv("words.csv", index=False)
-        print("Adjusted words saved to 'words.csv'.")
-    except Exception as e:
-        print(f"Error applying tone adjustments for words: {e}")
+    fileHandler.createWordsCsv("texts.csv", "words.csv")
 
     try:
         # Initialize MySQL DatabaseHandler
@@ -1043,4 +967,4 @@ def main():
     print("Pipeline completed successfully.")
 
 if __name__ == "__main__":
-    main() 
+    main()
