@@ -32,11 +32,51 @@ nlp = spacy.load("en_core_web_sm")
 
 
 class FileHandler:
+
     def __init__(self, dataset, stopwords, emotions, dataProcessor):
         self.dataset = dataset
         self.stopwords = stopwords
         self.emotions = emotions
         self.dataProcessor = dataProcessor  # Store the dataProcessor instance
+
+    @staticmethod
+    def cleanData(filePath, outputFilePath):
+        try:
+            # Load the dataset
+            data = pd.read_csv(filePath)
+            print(f"Dataset loaded successfully. Shape: {data.shape}")
+        except FileNotFoundError:
+            print(f"Error: File not found at {filePath}.")
+            return
+        except pd.errors.EmptyDataError:
+            print(f"Error: Dataset at {filePath} is empty.")
+            return
+        except Exception as e:
+            print(f"Unexpected error loading dataset: {e}")
+            return
+
+        # Detect and fill missing values
+        print("Checking for missing values...")
+        missingCount = data.isnull().sum()
+        print("Missing values before cleaning:")
+        print(missingCount)
+
+        for column in data.columns:
+            if data[column].dtype == "object":  # String or object columns
+                data[column] = data[column].fillna("None")
+            else:  # Numeric columns
+                data[column] = data[column].fillna(0)
+
+        print("Missing values after cleaning:")
+        print(data.isnull().sum())
+
+        # Save the cleaned dataset
+        try:
+            data.to_csv(outputFilePath, index=False)
+            print(f"Cleaned dataset saved to {outputFilePath}.")
+        except Exception as e:
+            print(f"Error saving cleaned dataset: {e}")
+
 
     def createTextsCsv(self, calculateToneImpact, dataProcessor):
         def addToneAndImpact(dataset):
@@ -84,7 +124,7 @@ class FileHandler:
         dataset = self.dataset
         dataset = addToneAndImpact(dataset)
         dataset = addEmotions(dataset)
-        dataset.to_csv('temp1texts.csv', index=False)  # Save final processed file as texts.csv
+        dataset.to_csv('temp1texts.csv', index=False)
 
     def createWordsCsv(self, inputFilePath, outputFilePath):
         print("Processing texts to create words.csv...")
@@ -133,7 +173,7 @@ class FileHandler:
 
     @staticmethod
     def cleanTempFiles():
-        tempFiles = ['temp1texts.csv', 'temp2texts.csv', 'temp3texts.csv']
+        tempFiles = ['temp1texts.csv', 'temp2texts.csv', 'temp3texts.csv', 'temp4texts.csv']
         for file in tempFiles:
             try:
                 if os.path.exists(file):
@@ -410,7 +450,7 @@ class ParameterImpactProcessor:
                             param = param.strip()
                             param = re.sub(r"#", "", param)
                             value = float(value.strip())
-                            if param in paramScores:
+                            if param in paramScores or param.lower() in paramScores:
                                 paramScores[param] = value
                         except ValueError:
                             print(f"Skipping malformed line: {line}")
@@ -437,7 +477,86 @@ class ParameterImpactProcessor:
 
             newData["toxicity_index"] = newData[toxicityColumns].sum(axis=1)
             newData["toxicity_impact"] = newData[toxicityImpactColumns].sum(axis=1)
+            
+            newData = newData.drop(columns=["likes", "comments"], errors="ignore")
+            mergedData = pd.merge(existingData, newData, on="text", how="left")
+            mergedData.to_csv(self.outputFilePath, index=False)
+            print(f"Processed data saved to {self.outputFilePath}.")
+        except Exception as e:
+            print(f"Error saving output file: {e}")
 
+class MentalHealthImpactProcessor:
+    def __init__(self, inputFilePath, outputFilePath, modelContextFile, parameters):
+        self.inputFilePath = inputFilePath
+        self.outputFilePath = outputFilePath
+        self.modelContextFile = modelContextFile
+        self.parameters = parameters
+
+    def processMentalParameters(self):
+        with open(self.modelContextFile, "r") as file:
+            context = file.read().replace('\n', ' ')
+
+        try:
+            existingData = pd.read_csv(self.inputFilePath)
+        except Exception as e:
+            print(f"Error loading input file: {e}")
+            return
+
+        processedData = []
+
+        for index, row in existingData.iterrows():
+            userInput = row['text']
+            likes = int(row.get("likes", 0))
+            comments = int(row.get("comments", 0))
+
+            if not userInput:
+                print(f"Skipping empty row at index {index}.")
+                continue
+
+            try:
+                prompt = f"{context} Text: {userInput}"
+                response = chat(
+                    model="llama3",
+                    messages=[{"role": "user", "content": prompt}]
+                )
+
+                response_lines = response["message"]["content"].split("\n")
+                paramScores = {param: 0 for param in self.parameters}
+
+                for line in response_lines:
+                    if ":" in line:
+                        try:
+                            param, value = line.split(":", 1)
+                            param = param.strip()
+                            value = float(value.strip())
+                            if param in paramScores or param.lower() in paramScores:
+                                paramScores[param] = value
+                        except ValueError:
+                            print(f"Skipping malformed line: {line}")
+
+                for param in self.parameters:
+                    impactCol = f"impact_{param}"
+                    paramScores[impactCol] = paramScores[param] * ((likes // 10) + comments)
+
+                paramScores.update({"text": userInput, "likes": likes, "comments": comments})
+                processedData.append(paramScores)
+
+            except Exception as e:
+                print(f"Error processing row {index}: {e}")
+                processedData.append({**{param: 0 for param in self.parameters},
+                                      **{f"impact_{param}": 0 for param in self.parameters},
+                                      "text": userInput, "likes": likes, "comments": comments})
+
+        try:
+            newData = pd.DataFrame(processedData)
+
+            toxicityColumns = self.parameters
+            toxicityImpactColumns = [f"impact_{param}" for param in self.parameters]
+
+            newData["distress_index"] = newData[toxicityColumns].sum(axis=1)
+            newData["distress_impact"] = newData[toxicityImpactColumns].sum(axis=1)
+
+            newData = newData.drop(columns=["likes", "comments"], errors="ignore")
             mergedData = pd.merge(existingData, newData, on="text", how="left")
             mergedData.to_csv(self.outputFilePath, index=False)
             print(f"Processed data saved to {self.outputFilePath}.")
@@ -678,47 +797,9 @@ class GUIHandler:
 
         root.mainloop()
 
-def cleanData(filePath, outputFilePath):
-    try:
-        # Load the dataset
-        data = pd.read_csv(filePath)
-        print(f"Dataset loaded successfully. Shape: {data.shape}")
-    except FileNotFoundError:
-        print(f"Error: File not found at {filePath}.")
-        return
-    except pd.errors.EmptyDataError:
-        print(f"Error: Dataset at {filePath} is empty.")
-        return
-    except Exception as e:
-        print(f"Unexpected error loading dataset: {e}")
-        return
-
-    # Detect and fill missing values
-    print("Checking for missing values...")
-    missingCount = data.isnull().sum()
-    print("Missing values before cleaning:")
-    print(missingCount)
-
-    for column in data.columns:
-        if data[column].dtype == "object":  # String or object columns
-            data[column] = data[column].fillna("None")
-        else:  # Numeric columns
-            data[column] = data[column].fillna(0)
-
-    print("Missing values after cleaning:")
-    print(data.isnull().sum())
-
-    # Save the cleaned dataset
-    try:
-        data.to_csv(outputFilePath, index=False)
-        print(f"Cleaned dataset saved to {outputFilePath}.")
-    except Exception as e:
-        print(f"Error saving cleaned dataset: {e}")
-
-
 def main():
     try:
-        cleanData("sentiment_dataset.csv", "cleaned_dataset.csv")  # Clean data
+        FileHandler.cleanData("sentiment_dataset.csv", "cleaned_dataset.csv")  # Clean data
     except FileNotFoundError:
         print("Error: 'sentiment_dataset.csv' not found. Ensure the file is in the correct directory.")
         return
@@ -908,15 +989,29 @@ def main():
         print("Processing parameters and impacts...")
         parameterProcessor = ParameterImpactProcessor(
             inputFilePath="temp3texts.csv",
-            outputFilePath="texts.csv",
+            outputFilePath="temp4texts.csv",
             modelContextFile="Flagging Prompts.txt",
             parameters = ['Ableist', 'Abusive', 'Ageist', 'Aggressive', 'Alienating', 'Antisemitic', 'Belittling', 'Belligerent', 'Bullying', 'Caustic', 'Classist', 'Condescending', 'Containing_slurs', 'Contemptful', 'Defamatory', 'Degrading', 'Demeaning', 'Demoralizing', 'Derisive', 'Derogatory', 'Despising', 'Destructive', 'Discriminatory', 'Disparaging', 'Disturbing', 'Enraging', 'Ethnocentric', 'Exclusionary', 'Harassing', 'Harmful', 'Hatespeech', 'Homophobic', 'Hostile', 'Hurtful', 'Incendiary', 'Inflammatory', 'Insulting', 'Intimidating', 'Intolerable', 'Intolerant', 'Islamophobic', 'Malicious', 'Marginalizing', 'Misogynistic', 'Mocking', 'Nasty', 'Obscene', 'Offensive', 'Oppressive', 'Overbearing', 'Pejorative', 'Prejudiced', 'Profane', 'Racist', 'Sarcastic', 'Scornful', 'Sexist', 'Slanderous', 'Spiteful', 'Threatening', 'Toxic', 'Transphobic', 'Traumatizing', 'Vindictive', 'Vindictive', 'Vulglar', 'Xenophobic']
 
         )
         parameterProcessor.processParameters()
+        print("Parameter impacts processed and saved to 'temp4texts.csv'.")
+    except Exception as e:
+        print(f"Error processing parameters: {e}")
+    
+    try:
+        print("Analysing psychological parameters of texts...")
+        mentalhealthProcessor = MentalHealthImpactProcessor(
+            inputFilePath="temp4texts.csv",
+            outputFilePath="texts.csv",
+            modelContextFile="mental health prompts.txt",
+            parameters = ['Abandoned', 'Afraid', 'Alienated', 'Alone', 'Anguished', 'Annoyed', 'Anxious', 'Apathetic', 'Apologetic', 'Apprehensive', 'Ashamed', 'Awkward', 'Bitter', 'Blameworthy', 'Burned Out', 'Concerned', 'Dejected', 'Demoralized', 'Despondent', 'Detached', 'Disconnected', 'Disheartened', 'Dissociative', 'Distraught', 'Doubtful', 'Drained', 'Dread', 'Edgy', 'Embarrassed', 'Empty', 'Enraged', 'Excluded', 'Exposed', 'Fatigued', 'Fearful', 'Forsaken', 'Frustrated', 'Furious', 'Gloomy', 'Heartbroken', 'Helpless', 'Hesitant', 'Hopeless', 'Hypervigilant', 'Indifferent', 'Insecure', 'Irritable', 'Isolated', 'Judged', 'Lethargic', 'Lost', 'Melancholy', 'Miserable', 'Misunderstood', 'Mourning', 'Nervous', 'Numb', 'Overwhelmed', 'Panicked', 'Paranoid', 'Pressured', 'Regretful', 'Remorseful', 'Resentful', 'Restless', 'Sad', 'Sarcasm', 'Scared', 'Secluded', 'Self-Critical', 'Shaky', 'Shy', 'Sorrowful', 'Startled', 'Stressed', 'Tense', 'Terrified', 'Tired', 'Triggered', 'Troubled', 'Uncertain', 'Uneasy', 'Unloved', 'Unmotivated', 'Unworthy', 'Vulnerable', 'Withdrawn', 'Worried', 'Worthless']
+        )
+        mentalhealthProcessor.processMentalParameters()
         print("Parameter impacts processed and saved to 'texts.csv'.")
     except Exception as e:
         print(f"Error processing parameters: {e}")
+
 
     fileHandler.createWordsCsv("texts.csv", "words.csv")
 
