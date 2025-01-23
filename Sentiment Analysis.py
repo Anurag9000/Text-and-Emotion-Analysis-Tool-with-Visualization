@@ -32,7 +32,6 @@ nlp = spacy.load("en_core_web_sm")
 
 
 class FileHandler:
-
     def __init__(self, dataset, stopwords, emotions, dataProcessor):
         self.dataset = dataset
         self.stopwords = stopwords
@@ -173,7 +172,7 @@ class FileHandler:
 
     @staticmethod
     def cleanTempFiles():
-        tempFiles = ['temp1texts.csv', 'temp2texts.csv', 'temp3texts.csv', 'temp4texts.csv']
+        tempFiles = ['temp1texts.csv', 'temp2texts.csv', 'temp3texts.csv', 'temp4texts.csv', 'temp5texts.csv']
         for file in tempFiles:
             try:
                 if os.path.exists(file):
@@ -402,97 +401,15 @@ class PoliticalScoreProcessor:
         self.sentimentDataset.to_csv(self.outputTextsPath, index=False)
         print("Political scores processing completed.")
 
-class ParameterImpactProcessor:
-    def __init__(self, inputFilePath, outputFilePath, modelContextFile, parameters):
+class ImpactProcessor:
+    def __init__(self, inputFilePath, outputFilePath, modelContextFile, parameters, metricName):
         self.inputFilePath = inputFilePath
         self.outputFilePath = outputFilePath
         self.modelContextFile = modelContextFile
         self.parameters = parameters
-        
+        self.metricName = metricName
+
     def processParameters(self):
-        # Load model context
-        with open(self.modelContextFile, "r") as file:
-            context = file.read().replace('\n', ' ')
-
-        # Read input data
-        try:
-            existingData = pd.read_csv(self.inputFilePath)
-        except Exception as e:
-            print(f"Error loading input file: {e}")
-            return
-
-        # Initialize result storage
-        processedData = []
-
-        for index, row in existingData.iterrows():
-            userInput = row['text']
-            likes = int(row.get("likes", 0))
-            comments = int(row.get("comments", 0))
-
-            if not userInput:
-                print(f"Skipping empty row at index {index}.")
-                continue
-
-            try:
-                prompt = f"{context} Text: {userInput}"
-                response = chat(
-                    model="llama3",
-                    messages=[{"role": "user", "content": prompt}]
-                )
-
-                response_lines = response["message"]["content"].split("\n")
-                paramScores = {param: 0 for param in self.parameters}
-
-                for line in response_lines:
-                    if ":" in line:
-                        try:
-                            param, value = line.split(":", 1)
-                            param = param.strip()
-                            param = re.sub(r"#", "", param)
-                            value = float(value.strip())
-                            if param in paramScores or param.lower() in paramScores:
-                                paramScores[param] = value
-                        except ValueError:
-                            print(f"Skipping malformed line: {line}")
-
-                for param in self.parameters:
-                    impactCol = f"impact_{param}"
-                    paramScores[impactCol] = paramScores[param] * ((likes // 10) + comments)
-
-                paramScores.update({"text": userInput, "likes": likes, "comments": comments})
-                processedData.append(paramScores)
-
-            except Exception as e:
-                print(f"Error processing row {index}: {e}")
-                processedData.append({**{param: 0 for param in self.parameters},
-                                      **{f"impact_{param}": 0 for param in self.parameters},
-                                      "text": userInput, "likes": likes, "comments": comments})
-
-        try:
-            newData = pd.DataFrame(processedData)
-
-            # Add toxicity_index and toxicity_impact columns
-            toxicityColumns = self.parameters
-            toxicityImpactColumns = [f"impact_{param}" for param in self.parameters]
-
-            newData["toxicity_index"] = newData[toxicityColumns].sum(axis=1)
-            newData["toxicity_impact"] = newData[toxicityImpactColumns].sum(axis=1)
-            
-            newData = newData.drop(columns=["likes", "comments"], errors="ignore")
-            mergedData = pd.merge(existingData, newData, on="text", how="left")
-            mergedData.to_csv(self.outputFilePath, index=False)
-            print(f"Processed data saved to {self.outputFilePath}.")
-        except Exception as e:
-            print(f"Error saving output file: {e}")
-
-class MentalHealthImpactProcessor:
-    def __init__(self, inputFilePath, outputFilePath, modelContextFile, parameters):
-        self.inputFilePath = inputFilePath
-        self.outputFilePath = outputFilePath
-        self.modelContextFile = modelContextFile
-        self.parameters = parameters
-
-    def processMentalParameters(self):
         with open(self.modelContextFile, "r") as file:
             context = file.read().replace('\n', ' ')
 
@@ -550,11 +467,12 @@ class MentalHealthImpactProcessor:
         try:
             newData = pd.DataFrame(processedData)
 
-            toxicityColumns = self.parameters
-            toxicityImpactColumns = [f"impact_{param}" for param in self.parameters]
+            metricColumns = self.parameters
+            impactColumns = [f"impact_{param}" for param in self.parameters]
 
-            newData["distress_index"] = newData[toxicityColumns].sum(axis=1)
-            newData["distress_impact"] = newData[toxicityImpactColumns].sum(axis=1)
+            # Dynamically calculate metric indices
+            newData[f"{self.metricName}_index"] = newData[metricColumns].sum(axis=1)
+            newData[f"{self.metricName}_impact"] = newData[impactColumns].sum(axis=1)
 
             newData = newData.drop(columns=["likes", "comments"], errors="ignore")
             mergedData = pd.merge(existingData, newData, on="text", how="left")
@@ -986,31 +904,79 @@ def main():
         print(f"Error applying tone adjustments for texts: {e}")
     
     try:
-        print("Processing parameters and impacts...")
-        parameterProcessor = ParameterImpactProcessor(
+        print("Processing flagging parameters and impacts...")
+        parameterProcessor = ImpactProcessor(
             inputFilePath="temp3texts.csv",
             outputFilePath="temp4texts.csv",
             modelContextFile="Flagging Prompts.txt",
-            parameters = ['Ableist', 'Abusive', 'Ageist', 'Aggressive', 'Alienating', 'Antisemitic', 'Belittling', 'Belligerent', 'Bullying', 'Caustic', 'Classist', 'Condescending', 'Containing_slurs', 'Contemptful', 'Defamatory', 'Degrading', 'Demeaning', 'Demoralizing', 'Derisive', 'Derogatory', 'Despising', 'Destructive', 'Discriminatory', 'Disparaging', 'Disturbing', 'Enraging', 'Ethnocentric', 'Exclusionary', 'Harassing', 'Harmful', 'Hatespeech', 'Homophobic', 'Hostile', 'Hurtful', 'Incendiary', 'Inflammatory', 'Insulting', 'Intimidating', 'Intolerable', 'Intolerant', 'Islamophobic', 'Malicious', 'Marginalizing', 'Misogynistic', 'Mocking', 'Nasty', 'Obscene', 'Offensive', 'Oppressive', 'Overbearing', 'Pejorative', 'Prejudiced', 'Profane', 'Racist', 'Sarcastic', 'Scornful', 'Sexist', 'Slanderous', 'Spiteful', 'Threatening', 'Toxic', 'Transphobic', 'Traumatizing', 'Vindictive', 'Vindictive', 'Vulglar', 'Xenophobic']
-
+            parameters=[
+                'Ableist', 'Abusive', 'Ageist', 'Aggressive', 'Alienating', 'Antisemitic', 'Belittling', 
+                'Belligerent', 'Bullying', 'Caustic', 'Classist', 'Condescending', 'Containing_slurs', 
+                'Contemptful', 'Defamatory', 'Degrading', 'Demeaning', 'Demoralizing', 'Derisive', 
+                'Derogatory', 'Despising', 'Destructive', 'Discriminatory', 'Disparaging', 'Disturbing', 
+                'Enraging', 'Ethnocentric', 'Exclusionary', 'Harassing', 'Harmful', 'Hatespeech', 
+                'Homophobic', 'Hostile', 'Hurtful', 'Incendiary', 'Inflammatory', 'Insulting', 
+                'Intimidating', 'Intolerable', 'Intolerant', 'Islamophobic', 'Malicious', 'Marginalizing', 
+                'Misogynistic', 'Mocking', 'Nasty', 'Obscene', 'Offensive', 'Oppressive', 'Overbearing', 
+                'Pejorative', 'Prejudiced', 'Profane', 'Racist', 'Sarcastic', 'Scornful', 'Sexist', 
+                'Slanderous', 'Spiteful', 'Threatening', 'Toxic', 'Transphobic', 'Traumatizing', 
+                'Vindictive', 'Vulglar', 'Xenophobic'
+            ],
+            metricName="toxicity"
         )
         parameterProcessor.processParameters()
-        print("Parameter impacts processed and saved to 'temp4texts.csv'.")
+        print("Flagging parameters processed and saved to 'temp4texts.csv'.")
     except Exception as e:
-        print(f"Error processing parameters: {e}")
-    
+        print(f"Error processing flagging parameters: {e}")
+
     try:
-        print("Analysing psychological parameters of texts...")
-        mentalhealthProcessor = MentalHealthImpactProcessor(
+        print("Processing psychological parameters and impacts...")
+        mentalHealthProcessor = ImpactProcessor(
             inputFilePath="temp4texts.csv",
-            outputFilePath="texts.csv",
+            outputFilePath="temp5texts.csv",
             modelContextFile="mental health prompts.txt",
-            parameters = ['Abandoned', 'Afraid', 'Alienated', 'Alone', 'Anguished', 'Annoyed', 'Anxious', 'Apathetic', 'Apologetic', 'Apprehensive', 'Ashamed', 'Awkward', 'Bitter', 'Blameworthy', 'Burned_Out', 'Concerned', 'Dejected', 'Demoralized', 'Despondent', 'Detached', 'Disconnected', 'Disheartened', 'Dissociative', 'Distraught', 'Doubtful', 'Drained', 'Dread', 'Edgy', 'Embarrassed', 'Emptiness', 'Enraged', 'Excluded', 'Exposed', 'Fatigued', 'Fearful', 'Forsaken', 'Frustrated', 'Furious', 'Gloomy', 'Heartbroken', 'Helpless', 'Hesitant', 'Hopeless', 'Hypervigilant', 'Indifferent', 'Insecure', 'Irritable', 'Isolated', 'Judged', 'Lethargic', 'Lost', 'Melancholy', 'Miserable', 'Misunderstood', 'Mourning', 'Nervous', 'Numb', 'Overwhelmed', 'Panicked', 'Paranoid', 'Pressured', 'Regretful', 'Remorseful', 'Resentful', 'Restless', 'Sad', 'Sarcasm', 'Scared', 'Secluded', 'Self_Critical', 'Shaky', 'Shy', 'Sorrowful', 'Startled', 'Stressed', 'Tense', 'Terrified', 'Tired', 'Triggered', 'Troubled', 'Uncertain', 'Uneasy', 'Unloved', 'Unmotivated', 'Unworthy', 'Vulnerable', 'Withdrawn', 'Worried', 'Worthless']
+            parameters=[
+                'Abandoned', 'Afraid', 'Alienated', 'Alone', 'Anguished', 'Annoyed', 'Anxious', 
+                'Apathetic', 'Apologetic', 'Apprehensive', 'Ashamed', 'Awkward', 'Bitter', 'Blameworthy', 
+                'Burned_Out', 'Concerned', 'Dejected', 'Demoralized', 'Despondent', 'Detached', 
+                'Disconnected', 'Disheartened', 'Dissociative', 'Distraught', 'Doubtful', 'Drained', 
+                'Dread', 'Edgy', 'Embarrassed', 'Emptiness', 'Enraged', 'Excluded', 'Exposed', 'Fatigued', 
+                'Fearful', 'Forsaken', 'Frustrated', 'Furious', 'Gloomy', 'Heartbroken', 'Helpless', 
+                'Hesitant', 'Hopeless', 'Hypervigilant', 'Indifferent', 'Insecure', 'Irritable', 
+                'Isolated', 'Judged', 'Lethargic', 'Lost', 'Melancholy', 'Miserable', 'Misunderstood', 
+                'Mourning', 'Nervous', 'Numb', 'Overwhelmed', 'Panicked', 'Paranoid', 'Pressured', 
+                'Regretful', 'Remorseful', 'Resentful', 'Restless', 'Sad', 'Sarcasm', 'Scared', 'Secluded', 
+                'Self_Critical', 'Shaky', 'Shy', 'Sorrowful', 'Startled', 'Stressed', 'Tense', 'Terrified', 
+                'Tired', 'Triggered', 'Troubled', 'Uncertain', 'Uneasy', 'Unloved', 'Unmotivated', 
+                'Unworthy', 'Vulnerable', 'Withdrawn', 'Worried', 'Worthless'
+            ],
+            metricName="distress"
         )
-        mentalhealthProcessor.processMentalParameters()
-        print("Parameter impacts processed and saved to 'texts.csv'.")
+        mentalHealthProcessor.processParameters()
+        print("Psychological parameters processed and saved to 'temp5texts.csv'.")
     except Exception as e:
-        print(f"Error processing parameters: {e}")
+        print(f"Error processing psychological parameters: {e}")
+
+    try:
+        print("Processing healing emotions...")
+        healingEmotionProcessor = ImpactProcessor(
+            inputFilePath="temp5texts.csv",
+            outputFilePath="texts.csv",
+            modelContextFile="healing prompts.txt",
+            parameters=[
+                "Calming", "Relaxed", "Safe", "Motivated", 
+                "Empowered", "Peaceful", "Confident", "Trusting", 
+                "Comforted", "Reassured", "Inspired", "Nurtured",
+                "Understanding", "Serene", "Fulfilled", "Energized",
+                "Harmonious", "Appreciative", "Confident", "Openness", "Sociable",
+                "Gracious", "Altruistic", "Reflective","Enthusiastic","Adventurous"
+                ],
+            metricName="healing"
+        )
+        healingEmotionProcessor.processParameters()
+        print("Healing emotions processed and saved to 'texts.csv'.")
+    except Exception as e:
+        print(f"Error processing healing emotions: {e}")
 
 
     fileHandler.createWordsCsv("texts.csv", "words.csv")
