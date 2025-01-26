@@ -13,6 +13,7 @@ import pandas as pd
 import os
 import torch
 import pymysql
+import csv
 nlp = spacy.load("en_core_web_sm")
 
 ## FUTURE SCOPE: DETECT NON ENGLISH NATIVE LANGUAGES WRITTEN IN LATIN SCRIPT OR OTHERWISE
@@ -42,7 +43,7 @@ class FileHandler:
     def cleanData(filePath, outputFilePath):
         try:
             # Load the dataset
-            data = pd.read_csv(filePath)
+            data = pd.read_csv(filePath, quotechar='"')
             print(f"Dataset loaded successfully. Shape: {data.shape}")
         except FileNotFoundError:
             print(f"Error: File not found at {filePath}.")
@@ -71,7 +72,7 @@ class FileHandler:
 
         # Save the cleaned dataset
         try:
-            data.to_csv(outputFilePath, index=False)
+            data.to_csv(outputFilePath, index=False, quoting=csv.QUOTE_MINIMAL)
             print(f"Cleaned dataset saved to {outputFilePath}.")
         except Exception as e:
             print(f"Error saving cleaned dataset: {e}")
@@ -123,13 +124,13 @@ class FileHandler:
         dataset = self.dataset
         dataset = addToneAndImpact(dataset)
         dataset = addEmotions(dataset)
-        dataset.to_csv('temp1texts.csv', index=False)
+        dataset.to_csv('temp1texts.csv', index=False, quoting=csv.QUOTE_MINIMAL)
 
     def createWordsCsv(self, inputFilePath, outputFilePath):
         print("Processing texts to create words.csv...")
 
         try:
-            textsDf = pd.read_csv(inputFilePath)
+            textsDf = pd.read_csv(inputFilePath, quotechar='"')
 
             # Ensure all columns except 'text' are numeric
             for col in textsDf.columns:
@@ -164,7 +165,7 @@ class FileHandler:
         wordDf.rename(columns={"index": "word"}, inplace=True)
 
         try:
-            wordDf.to_csv(outputFilePath, index=False)
+            wordDf.to_csv(outputFilePath, index=False, quoting=csv.QUOTE_MINIMAL)
             print(f"Words data saved to {outputFilePath}.")
         except Exception as e:
             print(f"Error saving words.csv: {e}")
@@ -312,7 +313,7 @@ class ComplexEmotionProcessor:
 
     def processTexts(self):
         print("Processing complex emotions for texts...")
-        textsDf = pd.read_csv(self.tempTextsPath)
+        textsDf = pd.read_csv(self.tempTextsPath, quotechar='"')
 
         complexEmotionScores = textsDf.apply(
             lambda row: self.calculateComplexEmotions(row, self.filteredEmotions), axis=1
@@ -322,7 +323,7 @@ class ComplexEmotionProcessor:
         updatedTextsDf = pd.concat([textsDf, complexEmotionDf], axis=1)
         updatedTextsDf = self.addImpactColumns(updatedTextsDf, self.filteredEmotions)
 
-        updatedTextsDf.to_csv(self.outputTextsPath, index=False)
+        updatedTextsDf.to_csv(self.outputTextsPath, index=False, quoting=csv.QUOTE_MINIMAL)
         print(f"Updated texts saved to {self.outputTextsPath}")
 
 class ToneAdjuster:
@@ -398,7 +399,7 @@ class PoliticalScoreProcessor:
         self.sentimentDataset['economic_impact'] = economicImpacts
         self.sentimentDataset['social_impact'] = socialImpacts
 
-        self.sentimentDataset.to_csv(self.outputTextsPath, index=False)
+        self.sentimentDataset.to_csv(self.outputTextsPath, index=False, quoting=csv.QUOTE_MINIMAL)
         print("Political scores processing completed.")
 
 class ImpactProcessor:
@@ -414,7 +415,7 @@ class ImpactProcessor:
             context = file.read().replace('\n', ' ')
 
         try:
-            existingData = pd.read_csv(self.inputFilePath)
+            existingData = pd.read_csv(self.inputFilePath, quotechar='"')
         except Exception as e:
             print(f"Error loading input file: {e}")
             return
@@ -476,7 +477,7 @@ class ImpactProcessor:
 
             newData = newData.drop(columns=["likes", "comments"], errors="ignore")
             mergedData = pd.merge(existingData, newData, on="text", how="left")
-            mergedData.to_csv(self.outputFilePath, index=False)
+            mergedData.to_csv(self.outputFilePath, index=False, quoting=csv.QUOTE_MINIMAL)
             print(f"Processed data saved to {self.outputFilePath}.")
         except Exception as e:
             print(f"Error saving output file: {e}")
@@ -530,7 +531,7 @@ class DatabaseHandler:
             return
 
         try:
-            df = pd.read_csv(csv_file)
+            df = pd.read_csv(csv_file, quotechar='"')
             df.fillna(0, inplace=True)
             cursor = self.conn.cursor()
 
@@ -634,7 +635,7 @@ class GUIHandler:
             return []
 
         try:
-            data = pd.read_csv(filePath)
+            data = pd.read_csv(filePath, quotechar='"')
             return list(data.columns)
         except Exception as e:
             print(f"Error loading columns for {selection}: {e}")
@@ -851,7 +852,7 @@ def main():
             )
             complexEmotionProcessor.processTexts()
 
-            sentimentDataset = pd.read_csv("temp2texts.csv")
+            sentimentDataset = pd.read_csv("temp2texts.csv", quotechar='"')
             politicalScoreProcessor = PoliticalScoreProcessor(
                 sentimentDataset=sentimentDataset,
                 outputTextsPath="temp3texts.csv"
@@ -893,12 +894,12 @@ def main():
 
     try:
         print("Applying tone adjustments for texts...")
-        textsDf = pd.read_csv("temp3texts.csv")
+        textsDf = pd.read_csv("temp3texts.csv", quotechar='"')
 
         toneAdjuster = ToneAdjuster(positiveEmotions, negativeEmotions)
         adjustedTextsDf = toneAdjuster.adjustToneAndImpact(textsDf)
 
-        adjustedTextsDf.to_csv("temp3texts.csv", index=False)
+        adjustedTextsDf.to_csv("temp3texts.csv", index=False, quoting=csv.QUOTE_MINIMAL)
         print("Adjusted texts saved to 'temp3texts.csv'.")
     except Exception as e:
         print(f"Error applying tone adjustments for texts: {e}")
@@ -917,10 +918,15 @@ def main():
                 'Enraging', 'Ethnocentric', 'Exclusionary', 'Harassing', 'Harmful', 'Hatespeech', 
                 'Homophobic', 'Hostile', 'Hurtful', 'Incendiary', 'Inflammatory', 'Insulting', 
                 'Intimidating', 'Intolerable', 'Intolerant', 'Islamophobic', 'Malicious', 'Marginalizing', 
-                'Misogynistic', 'Mocking', 'Nasty', 'Obscene', 'Offensive', 'Oppressive', 'Overbearing', 
-                'Pejorative', 'Prejudiced', 'Profane', 'Racist', 'Sarcastic', 'Scornful', 'Sexist', 
-                'Slanderous', 'Spiteful', 'Threatening', 'Toxic', 'Transphobic', 'Traumatizing', 
-                'Vindictive', 'Vulglar', 'Xenophobic'
+                'Misogynistic', 'Mocking', 'Dehumanizing', 'Objectifying', 'Segregating', 'Nasty', 'Obscene', 
+                'Offensive', 'Oppressive', 'Overbearing', 'Pejorative', 'Prejudiced', 'Profane', 'Racist',
+                'Sarcastic', 'Scornful', 'Sexist', 'Slanderous', 'Spiteful', 'Threatening', 'Toxic',
+                'Transphobic', 'Traumatizing', 'Vindictive', 'Vulgar', 'Xenophobic', 'Manipulative',
+                'Exploitative', 'Gaslighting', 'Patronizing', 'Overcritical', 'Fearmongering', 'Shaming',
+                'Pathologizing', "Trolling", "Cyberbullying", "Dogpiling", "Sealioning", "Doxxing",
+                "Brigading", "Spamming", "Clickbaiting", "Misinformation", "Disinformation",
+                "Profanity", "Alarmist", "Hysterical", "Vindictive", "Shocking",
+                "Overgeneralizing", "Narcissistic"
             ],
             metricName="toxicity"
         )
@@ -943,7 +949,7 @@ def main():
                 'Dread', 'Edgy', 'Embarrassed', 'Emptiness', 'Enraged', 'Excluded', 'Exposed', 'Fatigued', 
                 'Fearful', 'Forsaken', 'Frustrated', 'Furious', 'Gloomy', 'Heartbroken', 'Helpless', 
                 'Hesitant', 'Hopeless', 'Hypervigilant', 'Indifferent', 'Insecure', 'Irritable', 
-                'Isolated', 'Judged', 'Lethargic', 'Lost', 'Melancholy', 'Miserable', 'Misunderstood', 
+                'Isolated', 'Judged', 'Lethargic', 'Longing', 'Lost', 'Melancholy', 'Miserable', 'Misunderstood', 
                 'Mourning', 'Nervous', 'Numb', 'Overwhelmed', 'Panicked', 'Paranoid', 'Pressured', 
                 'Regretful', 'Remorseful', 'Resentful', 'Restless', 'Sad', 'Sarcasm', 'Scared', 'Secluded', 
                 'Self_Critical', 'Shaky', 'Shy', 'Sorrowful', 'Startled', 'Stressed', 'Tense', 'Terrified', 
@@ -968,7 +974,7 @@ def main():
                 "Empowered", "Peaceful", "Confident", "Trusting", 
                 "Comforted", "Reassured", "Inspired", "Nurtured",
                 "Understanding", "Serene", "Fulfilled", "Energized",
-                "Harmonious", "Appreciative", "Confident", "Openness", "Sociable",
+                "Harmonious", "Appreciative", "Openness", "Sociable",
                 "Gracious", "Altruistic", "Reflective","Enthusiastic","Adventurous"
                 ],
             metricName="healing"
@@ -992,8 +998,6 @@ def main():
 
         # Connect to the MySQL database
         db_handler.connect()
-
-        # Define column names for tables
         try:
             with open("create_texts_database.txt", 'r') as file:
                 texts_columns = file.read().replace('\n', ' ')
@@ -1018,8 +1022,8 @@ def main():
         print(f"Error in database handling: {e}")
 
     try:
-        textsDf = pd.read_csv("texts.csv")
-        wordsDf = pd.read_csv("words.csv")
+        textsDf = pd.read_csv("texts.csv", quotechar='"')
+        wordsDf = pd.read_csv("words.csv", quotechar='"')
         visualizer = Visualizer(textsDf, wordsDf)
     except Exception as e:
         print(f"Error loading data for Visualizer: {e}")
