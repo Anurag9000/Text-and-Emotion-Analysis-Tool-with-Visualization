@@ -1,0 +1,163 @@
+Sample context:
+
+### Calming:
+1. "The sound of the waves soothes my mind." (Score: 1)
+2. "This environment feels relaxing and quiet." (Score: 0.8)
+3. "Sometimes quiet moments can bring peace." (Score: 0)
+4. "Your ability to find calmness is inspiring." (Score: -1)
+
+### Relaxed:
+1. "I finally feel at ease after a long day." (Score: 1)
+2. "This chair helps me feel more comfortable." (Score: 0.7)
+3. "Relaxation is part of finding balance." (Score: 0)
+4. "You have the energy to take on new challenges." (Score: -1)
+
+### Safe:
+1. "I feel protected and secure here." (Score: 1)
+2. "This neighborhood gives me a sense of safety." (Score: 0.8)
+3. "Safety is a basic need we all deserve." (Score: 0)
+4. "Your courage helps others feel secure." (Score: -1)
+
+### Motivated:
+1. "I’m ready to tackle this new challenge." (Score: 1)
+2. "This goal keeps me inspired to work harder." (Score: 0.7)
+3. "Motivation can come from small victories." (Score: 0)
+4. "You’ve achieved so much already; keep going." (Score: -1)
+
+### Empowered:
+1. "I feel capable of achieving my dreams." (Score: 1)
+2. "This decision gave me the strength to move forward." (Score: 0.8)
+3. "Empowerment comes from believing in yourself." (Score: 0)
+4. "You’re using your strength to uplift others." (Score: -1)
+
+### Peaceful:
+1. "This setting fills me with tranquility." (Score: 1)
+2. "I feel at peace with the world around me." (Score: 0.7)
+3. "Finding peace takes patience and reflection." (Score: 0)
+4. "Your actions inspire peace in others." (Score: -1)
+
+### Confident:
+1. "I believe I can achieve anything I set my mind to." (Score: 1)
+2. "This new skill boosts my self-assurance." (Score: 0.8)
+3. "Confidence builds through practice and growth." (Score: 0)
+4. "You inspire others with your quiet confidence." (Score: -1)
+
+### Trusting:
+1. "I know I can rely on you completely." (Score: 1)
+2. "This relationship has earned my trust." (Score: 0.7)
+3. "Trust grows with time and understanding." (Score: 0)
+4. "Your trust in others encourages mutual respect." (Score: -1)
+
+### Comforted:
+1. "Your words bring me so much comfort." (Score: 1)
+2. "This blanket makes me feel cozy and warm." (Score: 0.7)
+3. "Comfort can be found in simple things." (Score: 0)
+4. "You bring comfort to those around you." (Score: -1)
+
+### Reassured:
+1. "Your presence reassures me that everything will be okay." (Score: 1)
+2. "This message helps ease my worries." (Score: 0.8)
+3. "Reassurance can help build confidence." (Score: 0)
+4. "You’re a source of reassurance for others." (Score: -1)
+
+### Inspired:
+1. "Your creativity motivates me to think outside the box." (Score: 1)
+2. "This story left me feeling deeply inspired." (Score: 0.8)
+3. "Inspiration can come from unexpected places." (Score: 0)
+4. "You inspire others with your vision and ideas." (Score: -1)
+
+### Nurtured:
+1. "This care makes me feel loved and valued." (Score: 1)
+2. "I feel nurtured when I’m surrounded by kindness." (Score: 0.7)
+3. "Nurturing relationships grow over time." (Score: 0)
+4. "You’re a nurturing presence for others." (Score: -1)
+
+### Understanding:
+1. "You really understand what I’m going through." (Score: 1)
+2. "This explanation makes the situation clearer." (Score: 0.8)
+3. "Understanding takes patience and listening." (Score: 0)
+4. "Your empathy and understanding are admirable." (Score: -1)
+
+### Serene:
+1. "The calmness of this place fills me with serenity." (Score: 1)
+2. "This view brings a sense of peacefulness." (Score: 0.7)
+3. "Serenity comes from appreciating the present moment." (Score: 0)
+4. "Your calm demeanor creates a serene atmosphere." (Score: -1)
+
+### Fulfilled:
+1. "Achieving this goal makes me feel complete." (Score: 1)
+2. "This experience has brought me a sense of fulfillment." (Score: 0.8)
+3. "Fulfillment comes from meaningful actions." (Score: 0)
+4. "You inspire fulfillment in the lives of others." (Score: -1)
+
+### Energized:
+1. "I feel full of energy and ready to take on the day." (Score: 1)
+2. "This activity left me feeling refreshed." (Score: 0.8)
+3. "Energy can be renewed with proper rest and care." (Score: 0)
+4. "Your enthusiasm energizes those around you." (Score: -1)
+
+### Harmonious:
+1. "Everything feels in balance and harmony here." (Score: 1)
+2. "This music brings a sense of harmony to my day." (Score: 0.7)
+3. "Harmony comes from aligning with your values." (Score: 0)
+4. "Your actions create harmony in your relationships." (Score: -1)
+
+### Appreciative:
+1. "I’m grateful for everything you’ve done." (Score: 1)
+2. "This gesture makes me feel truly appreciated." (Score: 0.8)
+3. "Appreciation grows with gratitude and awareness." (Score: 0)
+4. "You show genuine appreciation for others." (Score: -1)
+
+### Openness:
+1. "I’m ready to explore new ideas and opportunities." (Score: 1)
+2. "This conversation opened my mind to new perspectives." (Score: 0.7)
+3. "Openness leads to growth and understanding." (Score: 0)
+4. "Your openness inspires trust and collaboration." (Score: -1)
+
+
+### Sociable:
+1. "I enjoy spending time with friends and meeting new people." (Score: 1)
+2. "This gathering makes me feel connected and happy." (Score: 0.7)
+3. "Being sociable can strengthen relationships." (Score: 0)
+4. "You bring people together with your sociable nature." (Score: -1)
+
+### Gracious:
+1. "Your kindness and grace are truly inspiring." (Score: 1)
+2. "This act of generosity has filled me with gratitude." (Score: 0.8)
+3. "Grace comes from acting with kindness and humility." (Score: 0)
+4. "Your graciousness leaves a lasting impact on others." (Score: -1)
+
+### Altruistic:
+1. "Your selflessness inspires me to help others." (Score: 1)
+2. "This act of giving shows your altruistic spirit." (Score: 0.8)
+3. "Altruism stems from genuine care for others." (Score: 0)
+4. "Your altruism makes a difference in the lives of many." (Score: -1)
+
+### Reflective:
+1. "This quiet time has given me space to reflect." (Score: 1)
+2. "I’ve been thinking deeply about my actions lately." (Score: 0.7)
+3. "Reflection helps us learn and grow." (Score: 0)
+4. "Your reflective nature inspires thoughtful decisions." (Score: -1)
+
+### Enthusiastic:
+1. "I can’t wait to get started on this project!" (Score: 1)
+2. "This opportunity excites me greatly." (Score: 0.8)
+3. "Enthusiasm brings energy and positivity." (Score: 0)
+4. "Your enthusiasm inspires everyone around you." (Score: -1)
+
+### Adventurous:
+1. "I’m ready to explore new horizons and try new things." (Score: 1)
+2. "This trip has sparked my adventurous spirit." (Score: 0.8)
+3. "Adventure comes from stepping outside your comfort zone." (Score: 0)
+4. "Your adventurous nature inspires others to take risks." (Score: -1)
+
+As provided in the sample context, your task is to evaluate the following statement: '{user_input}'. For each parameter in the list of emotions derived from the uploaded file, provide a score in the format 'Parameter: Score'. Evaluate the provided statement strictly in terms of the listed parameters. Provide only the parameter name followed by its score in the format 'Parameter: Score' for all the parameters provided in the uploaded file.
+
+If the subject of the text is inanimate objects such as materials, academic subjects, or food, assign a score of 0 to all parameters, as these categories are not applicable for judgment under the given parameters. If the statement refers to people, behaviors, or actions, evaluate the parameters appropriately based on the context.
+
+Ensure that all scores are numerical, and avoid using N/A or providing any explanations or additional comments. The output should be concise, listing only the parameter names and their corresponding numerical scores. For parameters that do not exist in the sentence, assign a score of 0. Do not include any explanations or additional comments. Instead of N/A, give 0. Give output for all the parameters, and all the scores must and must be between -1 and 1. Try to be as precise as you can in allocating the scores, using decimal scores in between -1 and 1 for non-extreme statements instead of 0.
+
+For each parameter in the list derived from the uploaded file, return its score strictly in the format:
+`parameter: score_parameter`
+
+You will strictly adhere to this format and return scores for all the parameters in the list parameters = ["Calming", "Relaxed", "Safe", "Motivated", "Empowered", "Peaceful", "Confident", "Trusting", "Comforted", "Reassured", "Inspired", "Nurtured", "Understanding", "Serene", "Fulfilled", "Energized", "Harmonious", "Appreciative", "Confident", "Openness", "Sociable", "Gracious", "Altruistic", "Reflective", "Enthusiastic", "Adventurous"]

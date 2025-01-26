@@ -1,0 +1,552 @@
+Sample context:
+
+### Abandoned:
+1. "No one ever comes back for me." (Score: 1)
+2. "I feel like I’ve been forgotten." (Score: 0.7)
+3. "Sometimes people need space." (Score: 0)
+4. "You are deeply valued by those around you." (Score: -1)
+
+### Afraid:
+1. "I’m terrified of what’s to come." (Score: 1)
+2. "I’m nervous about this situation." (Score: 0.5)
+3. "It’s okay to feel cautious sometimes." (Score: 0)
+4. "You have the courage to face anything." (Score: -1)
+
+### Alienated:
+1. "No one understands me here." (Score: 1)
+2. "I don’t feel like I belong in this place." (Score: 0.7)
+3. "Sometimes we all feel out of place." (Score: 0)
+4. "You are a valued part of this community." (Score: -1)
+
+### Alone:
+1. "I’m always by myself and it hurts." (Score: 1)
+2. "Being alone makes me feel vulnerable." (Score: 0.6)
+3. "Sometimes solitude helps clear the mind." (Score: 0)
+4. "You are surrounded by people who care about you." (Score: -1)
+
+### Anguished:
+1. "This pain is unbearable." (Score: 1)
+2. "I’m struggling to cope with these feelings." (Score: 0.8)
+3. "It’s okay to acknowledge your pain." (Score: 0)
+4. "You have the strength to overcome this." (Score: -1)
+
+### Annoyed:
+1. "I can’t stand this situation any longer." (Score: 1)
+2. "This really frustrates me." (Score: 0.7)
+3. "Sometimes things don’t go as planned." (Score: 0)
+4. "You have the patience to handle this calmly." (Score: -1)
+
+### Anxious:
+1. "I can’t stop worrying about the future." (Score: 1)
+2. "This situation is making me uneasy." (Score: 0.6)
+3. "It’s normal to feel concerned sometimes." (Score: 0)
+4. "You’re handling this with great resilience." (Score: -1)
+
+### Apathetic:
+1. "I just don’t care anymore." (Score: 1)
+2. "I feel so indifferent towards everything." (Score: 0.7)
+3. "It’s okay to feel disconnected at times." (Score: 0)
+4. "You have the passion to reignite your interests." (Score: -1)
+
+### Apologetic:
+1. "I can’t stop blaming myself for what happened." (Score: 1)
+2. "I feel so guilty about my actions." (Score: 0.6)
+3. "Taking responsibility is a step toward growth." (Score: 0)
+4. "You’ve already done enough to make amends." (Score: -1)
+
+### Apprehensive:
+1. "I’m afraid something bad is about to happen." (Score: 1)
+2. "I’m hesitant to take the next step." (Score: 0.5)
+3. "It’s okay to proceed with caution." (Score: 0)
+4. "You’re capable of facing this with confidence." (Score: -1)
+
+### Ashamed:
+1. "I can’t believe I let everyone down." (Score: 1)
+2. "I feel so embarrassed about what I did." (Score: 0.7)
+3. "It’s okay to make mistakes; we’re all human." (Score: 0)
+4. "Your courage to face this is admirable." (Score: -1)
+
+### Awkward:
+1. "I feel completely out of place here." (Score: 1)
+2. "This situation makes me uncomfortable." (Score: 0.6)
+3. "Sometimes awkward moments bring laughter later." (Score: 0)
+4. "You bring a unique charm to every situation." (Score: -1)
+
+### Bitter:
+1. "I can’t stop resenting what happened." (Score: 1)
+2. "This experience has left a bad taste in my mouth." (Score: 0.8)
+3. "It’s okay to feel disappointed; it’s part of healing." (Score: 0)
+4. "You’re strong enough to let go and move forward." (Score: -1)
+
+### Blameworthy:
+1. "Everything that went wrong is my fault." (Score: 1)
+2. "I feel responsible for this mess." (Score: 0.7)
+3. "Acknowledging your part is a step towards resolution." (Score: 0)
+4. "You’ve done everything you can to make things right." (Score: -1)
+
+### Burned_Out:
+1. "I feel like I can’t keep going anymore." (Score: 1)
+2. "Everything feels overwhelming and exhausting." (Score: 0.8)
+3. "It’s okay to take a break and recharge." (Score: 0)
+4. "You’re capable of bouncing back stronger than ever." (Score: -1)
+
+### Concerned:
+1. "I’m worried something bad will happen." (Score: 1)
+2. "I can’t help but feel anxious about this." (Score: 0.6)
+3. "It’s natural to care deeply about outcomes." (Score: 0)
+4. "Your thoughtfulness shows your strength and compassion." (Score: -1)
+
+### Dejected:
+1. "I feel like nothing will ever go right again." (Score: 1)
+2. "This situation has left me feeling hopeless." (Score: 0.7)
+3. "Even in tough times, brighter days are ahead." (Score: 0)
+4. "You have the resilience to rise above this." (Score: -1)
+
+### Demoralized:
+1. "I don’t see the point in trying anymore." (Score: 1)
+2. "My efforts feel completely meaningless." (Score: 0.8)
+3. "It’s okay to take a step back and reassess." (Score: 0)
+4. "You inspire others with your determination to keep going." (Score: -1)
+
+### Despondent:
+1. "I’ve lost all hope for the future." (Score: 1)
+2. "Nothing seems worth the effort anymore." (Score: 0.8)
+3. "Even small steps can lead to a better tomorrow." (Score: 0)
+4. "Your strength to persevere is truly remarkable." (Score: -1)
+
+### Detached:
+1. "I feel completely disconnected from everything." (Score: 1)
+2. "Nothing seems to matter to me right now." (Score: 0.7)
+3. "Sometimes detachment is a way to cope temporarily." (Score: 0)
+4. "You’re finding your way back to connection and purpose." (Score: -1)
+
+### Disconnected:
+1. "I feel so far away from everyone." (Score: 1)
+2. "It’s like I’m on the outside looking in." (Score: 0.7)
+3. "Sometimes feeling distant is temporary." (Score: 0)
+4. "You’re deeply connected to those who care about you." (Score: -1)
+
+### Disheartened:
+1. "I’ve lost all motivation to keep going." (Score: 1)
+2. "Everything feels so discouraging." (Score: 0.8)
+3. "It’s okay to feel down; things will improve." (Score: 0)
+4. "You’re capable of reigniting your inner strength." (Score: -1)
+
+### Dissociative:
+1. "I feel like I’m not even present in my own life." (Score: 1)
+2. "It’s as if I’m floating away from reality." (Score: 0.8)
+3. "Grounding techniques can help bring you back." (Score: 0)
+4. "You’re finding your way back to stability and peace." (Score: -1)
+
+### Distraught:
+1. "I can’t handle this overwhelming sadness." (Score: 1)
+2. "Everything feels chaotic and unbearable." (Score: 0.7)
+3. "Even in tough times, moments of calm can come." (Score: 0)
+4. "You have the resilience to find balance again." (Score: -1)
+
+### Doubtful:
+1. "I don’t think I can do this." (Score: 1)
+2. "I’m questioning everything about myself." (Score: 0.6)
+3. "Doubts are natural; they can help you grow." (Score: 0)
+4. "You’re capable of achieving amazing things." (Score: -1)
+
+### Drained:
+1. "I have no energy left to give." (Score: 1)
+2. "Everything feels so exhausting right now." (Score: 0.8)
+3. "Rest and recharge; you deserve it." (Score: 0)
+4. "Your strength will return stronger than before." (Score: -1)
+
+### Dread:
+1. "I’m terrified of what’s coming next." (Score: 1)
+2. "I feel an overwhelming sense of doom." (Score: 0.7)
+3. "Sometimes fears aren’t as bad as they seem." (Score: 0)
+4. "You have the courage to face challenges head-on." (Score: -1)
+
+### Edgy:
+1. "I feel like I’m about to snap." (Score: 1)
+2. "Everything is making me so jumpy and irritable." (Score: 0.6)
+3. "It’s okay to feel unsettled at times." (Score: 0)
+4. "You’re finding calmness amidst the chaos." (Score: -1)
+
+### Embarrassed:
+1. "I can’t believe I made such a fool of myself." (Score: 1)
+2. "I’m cringing at my own actions." (Score: 0.6)
+3. "Everyone makes mistakes; it’s part of being human." (Score: 0)
+4. "Your ability to laugh it off is inspiring." (Score: -1)
+
+### Emptiness:
+1. "I feel hollow inside, like nothing matters anymore." (Score: 1)  
+2. "It’s like I’m just going through the motions without purpose." (Score: 0.8)  
+3. "Even emptiness is a space where growth and renewal can begin." (Score: 0)  
+4. "You’re finding ways to fill your life with meaning and connection." (Score: -1)
+
+### Enraged:
+1. "I feel like I’m about to explode with anger; I can’t hold it in." (Score: 1)  
+2. "Everything around me is fueling this fire of frustration." (Score: 0.8)  
+3. "Taking a moment to breathe can help channel this energy constructively." (Score: 0)  
+4. "You’re turning your anger into a force for positive change." (Score: -1)  
+
+### Excluded:
+1. "I feel like I’m not part of the group." (Score: 1)
+2. "No one considers me in their plans." (Score: 0.6)
+3. "Sometimes people don’t realize how their actions affect others." (Score: 0)
+4. "You bring something special to every group you’re in." (Score: -1)
+
+### Exposed:  
+1. "I feel completely vulnerable, like all my flaws are on display." (Score: 1)  
+2. "It’s as though everyone can see the parts of me I want to hide." (Score: 0.8)  
+3. "Feeling exposed can be a step toward embracing your authentic self." (Score: 0)  
+4. "You’re finding strength in showing your true self to the world." (Score: -1)  
+
+### Fatigued:
+1. "I’m completely out of energy." (Score: 1)
+2. "Even the smallest tasks feel impossible." (Score: 0.8)
+3. "Rest is important for recovery." (Score: 0)
+4. "You’re resilient and will regain your strength soon." (Score: -1)
+
+### Fearful:
+1. "I’m scared of what might happen." (Score: 1)
+2. "Everything feels so uncertain and threatening." (Score: 0.7)
+3. "It’s okay to acknowledge your fears." (Score: 0)
+4. "You have the courage to face this head-on." (Score: -1)
+
+### Forsaken:
+1. "I feel completely abandoned and forgotten by everyone." (Score: 1)  
+2. "It’s as though no one cares about me or what I’m going through." (Score: 0.8)  
+3. "Feeling forsaken can open the door to seeking support and connection." (Score: 0)  
+4. "You’re rediscovering that you are valued and never truly alone." (Score: -1)  
+
+### Frustrated:
+1. "I’m so irritated; nothing is going right." (Score: 1)
+2. "I’ve hit a wall, and it feels impossible to move forward." (Score: 0.6)
+3. "Sometimes frustration is a sign you care deeply about the outcome." (Score: 0)
+4. "You’re navigating these challenges with admirable persistence." (Score: -1)
+
+### Furious:  
+1. "I’m seething with anger; I can’t calm down." (Score: 1)  
+2. "Everything is making me angrier by the second." (Score: 0.8)  
+3. "Expressing anger constructively can lead to resolution." (Score: 0)  
+4. "You’re channeling your anger into productive action." (Score: -1)  
+
+### Gloomy:  
+1. "It feels like a dark cloud is hanging over me." (Score: 1)  
+2. "Everything seems bleak and hopeless right now." (Score: 0.7)  
+3. "Even gloomy days can pass, making way for brighter ones." (Score: 0)  
+4. "You’re finding light even in the darkest moments." (Score: -1)  
+
+### Heartbroken:  
+1. "I feel like my heart has been shattered into pieces." (Score: 1)  
+2. "This pain feels unbearable and endless." (Score: 0.8)  
+3. "Grieving shows how deeply you cared." (Score: 0)  
+4. "You’re slowly healing and carrying your love forward." (Score: -1)  
+
+### Helpless:  
+1. "I feel like I can’t do anything to fix this situation." (Score: 1)  
+2. "No matter what I try, it all feels pointless." (Score: 0.7)  
+3. "Small steps forward can help rebuild your sense of control." (Score: 0)  
+4. "You’re discovering your strength to overcome this." (Score: -1)  
+
+### Hesitant:  
+1. "I’m second-guessing every decision I make." (Score: 1)  
+2. "I feel unsure and afraid to take the next step." (Score: 0.6)  
+3. "Taking your time to decide can bring clarity." (Score: 0)  
+4. "You’re building confidence in your choices and actions." (Score: -1)  
+
+### Hopeless:  
+1. "I can’t see how things could ever improve." (Score: 1)  
+2. "Everything feels like it’s falling apart and beyond repair." (Score: 0.8)  
+3. "Even the smallest glimmers of hope can make a difference." (Score: 0)  
+4. "You’re finding resilience and rediscovering hope." (Score: -1)  
+
+### Hypervigilant:  
+1. "I’m constantly on edge, watching for anything that might go wrong." (Score: 1)  
+2. "It feels exhausting to stay alert all the time." (Score: 0.8)  
+3. "Grounding yourself in the present can ease hypervigilance." (Score: 0)  
+4. "You’re finding ways to feel safe and at ease again." (Score: -1)  
+
+### Indifferent:
+1. "I just don’t care about anything anymore." (Score: 1)
+2. "Nothing feels meaningful or worth my time." (Score: 0.6)
+3. "It’s okay to feel disconnected sometimes." (Score: 0)
+4. "You’re finding purpose in your own time and way." (Score: -1)
+
+### Insecure:
+1. "I’m constantly doubting myself and my abilities." (Score: 1)
+2. "I feel like I’m not good enough for anything." (Score: 0.7)
+3. "It’s normal to have moments of self-doubt." (Score: 0)
+4. "You have unique strengths that make you valuable." (Score: -1)
+
+### Irritable:
+1. "I can’t stand anything right now; everything feels wrong." (Score: 1)
+2. "Even small things are getting on my nerves." (Score: 0.7)
+3. "It’s okay to feel irritable sometimes; it happens to everyone." (Score: 0)
+4. "You’re showing remarkable composure despite the frustration." (Score: -1)
+
+### Isolated:
+1. "I feel completely cut off from everyone and everything." (Score: 1)
+2. "It feels like no one understands or even sees me." (Score: 0.8)
+3. "Even in moments of isolation, connection is still possible." (Score: 0)
+4. "You are deeply valued and connected to those around you." (Score: -1)
+
+### Judged:
+1. "I feel like everyone is criticizing me constantly." (Score: 1)
+2. "I can’t stop worrying about what others think of me." (Score: 0.6)
+3. "Sometimes people’s opinions don’t reflect your true worth." (Score: 0)
+4. "You are more than others’ perceptions of you." (Score: -1)
+
+### Lethargic:
+1. "I can’t find the energy to do anything." (Score: 1)
+2. "Everything feels like too much effort right now." (Score: 0.7)
+3. "It’s okay to take time to rest and recharge." (Score: 0)
+4. "You’ll regain your energy and enthusiasm soon." (Score: -1)
+
+### Longing:
+1. "I’m yearning for something I can’t have." (Score: 1)
+2. "This ache of wanting feels endless." (Score: 0.8)
+3. "Longing shows how much you care about what matters to you." (Score: 0)
+4. "Your dedication will bring you closer to what you seek." (Score: -1)
+
+### Lost:
+1. "I don’t know where I’m going or what I’m doing." (Score: 1)
+2. "Everything feels directionless and confusing." (Score: 0.7)
+3. "Even feeling lost is part of finding your path." (Score: 0)
+4. "You’re on a journey, and clarity will come with time." (Score: -1)
+
+### Melancholy:
+1. "There’s a sadness I can’t shake, even in happy moments." (Score: 1)
+2. "Everything feels tinted with a bittersweet sadness." (Score: 0.7)
+3. "Melancholy can be a space for reflection and growth." (Score: 0)
+4. "You have the strength to embrace both sadness and joy." (Score: -1)
+
+### Miserable:
+1. "I feel like nothing will ever get better." (Score: 1)
+2. "Everything hurts, and I can’t find relief." (Score: 0.8)
+3. "Acknowledging pain is the first step toward healing." (Score: 0)
+4. "You’re resilient and will find brighter days ahead." (Score: -1)
+
+### Misunderstood:
+1. "No one truly gets what I’m going through." (Score: 1)
+2. "It feels like my feelings and intentions are invisible to others." (Score: 0.6)
+3. "Expressing yourself openly can bridge gaps in understanding." (Score: 0)
+4. "You are seen and valued for who you truly are." (Score: -1)
+
+### Mourning:
+1. "The loss feels overwhelming; I can’t move forward." (Score: 1)
+2. "It’s hard to imagine life without what I’ve lost." (Score: 0.8)
+3. "Mourning is a way to honor what mattered deeply to you." (Score: 0)
+4. "Your ability to cherish memories keeps their spirit alive." (Score: -1)
+
+### Nervous:  
+1. "I feel jittery, like my heart won’t stop racing." (Score: 1)  
+2. "Everything about this situation is making me anxious." (Score: 0.7)  
+3. "Nervousness shows that you care deeply about the outcome." (Score: 0)  
+4. "You’re turning your nervous energy into focused determination." (Score: -1)  
+
+### Numb:
+1. "I feel nothing; it’s like I’m empty inside." (Score: 1)
+2. "Everything feels muted, like I’m detached from it all." (Score: 0.8)
+3. "Sometimes feeling numb is a way your mind protects itself." (Score: 0)
+4. "You’re finding your way back to feeling fully alive again." (Score: -1)
+
+### Overwhelmed:
+1. "I can’t handle this; it’s too much all at once." (Score: 1)
+2. "Everything feels like it’s crashing down on me." (Score: 0.7)
+3. "It’s okay to pause and take things one step at a time." (Score: 0)
+4. "You’re managing these challenges with strength and grace." (Score: -1)
+
+### Panicked:
+1. "My heart is racing; I feel like I’m losing control." (Score: 1)
+2. "I can’t think clearly; everything feels urgent and terrifying." (Score: 0.8)
+3. "Taking deep breaths can help regain clarity and calm." (Score: 0)
+4. "You’re finding your courage to face this moment." (Score: -1)
+
+### Paranoid:
+1. "I feel like everyone is out to get me." (Score: 1)
+2. "I can’t stop doubting the intentions of those around me." (Score: 0.7)
+3. "Sometimes it helps to seek reassurance from trusted people." (Score: 0)
+4. "You’re capable of finding balance and trusting wisely." (Score: -1)
+
+### Pressured:
+1. "I feel like I’m being crushed under all these expectations." (Score: 1)
+2. "It’s like there’s no room to breathe or make mistakes." (Score: 0.7)
+3. "It’s okay to set boundaries and prioritize your well-being." (Score: 0)
+4. "You’re handling these demands with admirable resilience." (Score: -1)
+
+### Regretful:
+1. "I can’t stop replaying the mistakes I made." (Score: 1)
+2. "I feel so guilty about the things I wish I could change." (Score: 0.8)
+3. "Regret shows how much you care about doing the right thing." (Score: 0)
+4. "You’re learning and growing from every experience." (Score: -1)
+
+### Remorseful:
+1. "I wish I could take back what I said or did." (Score: 1)
+2. "The guilt feels unbearable; I’ve hurt someone I care about." (Score: 0.8)
+3. "Expressing your remorse is a step toward healing and making amends." (Score: 0)
+4. "You’re taking meaningful steps to repair and rebuild." (Score: -1)
+
+### Resentful:
+1. "I can’t stop holding onto this anger and bitterness." (Score: 1)
+2. "It feels unfair, and I can’t let it go." (Score: 0.7)
+3. "Acknowledging your feelings is the first step to moving forward." (Score: 0)
+4. "You’re finding ways to release resentment and embrace peace." (Score: -1)
+
+### Restless:
+1. "I can’t sit still; my mind is racing with thoughts." (Score: 1)
+2. "Everything feels unsettled, like I’m waiting for something to happen." (Score: 0.6)
+3. "Sometimes channeling restlessness into action can help." (Score: 0)
+4. "You’re turning this energy into something productive and meaningful." (Score: -1)
+
+### Sad:
+1. "I feel so heavy and weighed down by my emotions." (Score: 1)
+2. "Everything feels gray and joyless." (Score: 0.7)
+3. "Sadness is a natural part of processing difficult moments." (Score: 0)
+4. "You’re finding strength to embrace brighter days ahead." (Score: -1)
+
+### Sarcasm:
+1. "Oh, great, another brilliant idea that won’t work." (Score: 1)
+2. "Yeah, because this is exactly what we needed right now." (Score: 0.8)
+3. "Sometimes sarcasm masks deeper feelings of frustration." (Score: 0)
+4. "You’re finding ways to communicate your concerns constructively." (Score: -1)
+
+### Scared:
+1. "I feel like something bad is about to happen." (Score: 1)
+2. "I’m so afraid; I can’t think clearly." (Score: 0.7)
+3. "Acknowledging fear is the first step toward overcoming it." (Score: 0)
+4. "You’re discovering the courage to face your fears." (Score: -1)
+
+### Secluded:
+1. "I’m all alone, and it feels like no one cares." (Score: 1)
+2. "It’s as though I’m invisible to the world around me." (Score: 0.8)
+3. "Sometimes solitude can provide a moment for reflection." (Score: 0)
+4. "You’re reconnecting with others and finding community." (Score: -1)
+
+### Self_Critical:
+1. "I’m my own worst enemy; I can’t stop picking apart my mistakes." (Score: 1)
+2. "Nothing I do ever feels good enough." (Score: 0.7)
+3. "It’s okay to acknowledge your efforts and celebrate small wins." (Score: 0)
+4. "You’re learning to be kinder to yourself and appreciate your progress." (Score: -1)
+
+### Shaky:
+1. "I feel unsteady, like I’m on the verge of falling apart." (Score: 1)
+2. "My confidence is wavering, and I’m unsure of everything." (Score: 0.6)
+3. "It’s okay to pause and find your footing again." (Score: 0)
+4. "You’re regaining your balance and moving forward with strength." (Score: -1)
+
+### Shy:
+1. "I feel so awkward and out of place around others." (Score: 1)
+2. "It’s hard to speak up when I’m so self-conscious." (Score: 0.6)
+3. "Being shy is part of what makes you thoughtful and introspective." (Score: 0)
+4. "You’re finding the confidence to share your unique voice." (Score: -1)
+
+### Sorrowful:
+1. "This sadness feels overwhelming and endless." (Score: 1)
+2. "I’m grieving for something I’ve lost, and it’s hard to move on." (Score: 0.8)
+3. "Sorrow shows the depth of your care and love." (Score: 0)
+4. "You’re honoring what matters to you while finding ways to heal." (Score: -1)
+
+### Startled:
+1. "I wasn’t expecting that, and it’s left me shaken." (Score: 1)
+2. "Everything happened so fast, and I’m still trying to process it." (Score: 0.6)
+3. "It’s natural to feel startled in the face of surprises." (Score: 0)
+4. "You’re adapting quickly and handling surprises with grace." (Score: -1)
+
+### Stressed:
+1. "I’m carrying too much, and it’s all piling up on me." (Score: 1)
+2. "Everything feels urgent, and I can’t catch a break." (Score: 0.7)
+3. "Taking a moment to breathe can help ease the tension." (Score: 0)
+4. "You’re managing challenges with incredible resilience and focus." (Score: -1)
+
+### Tense:
+1. "My whole body feels wound up, like I’m ready to snap." (Score: 1)
+2. "It’s hard to relax when everything feels so tight and overwhelming." (Score: 0.7)
+3. "Stretching or taking a short break can help release tension." (Score: 0)
+4. "You’re finding ways to bring calmness and relaxation into your day." (Score: -1)
+
+### Terrified:
+1. "I feel frozen in fear; I can’t move or think." (Score: 1)
+2. "It’s like my worst nightmare is happening." (Score: 0.8)
+3. "Acknowledging your fear is the first step toward overcoming it." (Score: 0)
+4. "You’re finding courage to face what frightens you most." (Score: -1)
+
+### Tired:
+1. "I feel completely drained; I can’t keep going." (Score: 1)
+2. "Even the simplest tasks feel impossible right now." (Score: 0.7)
+3. "Rest is essential; it’s okay to take a break." (Score: 0)
+4. "You’re recharging and regaining your strength." (Score: -1)
+
+### Triggered:
+1. "I’m reliving painful memories, and it’s overwhelming." (Score: 1)
+2. "Something brought up emotions I thought I’d moved past." (Score: 0.8)
+3. "Grounding yourself in the present can help ease these feelings." (Score: 0)
+4. "You’re learning to navigate and heal from difficult experiences." (Score: -1)
+
+### Troubled:
+1. "I can’t stop worrying about everything that’s going wrong." (Score: 1)
+2. "This situation feels too heavy to handle on my own." (Score: 0.7)
+3. "It’s okay to share your concerns with someone you trust." (Score: 0)
+4. "You’re finding ways to address and resolve these challenges." (Score: -1)
+
+### Uncertain:
+1. "I don’t know what to do next; everything feels unclear." (Score: 1)
+2. "I’m second-guessing every decision I’ve made." (Score: 0.6)
+3. "Uncertainty can lead to new opportunities and growth." (Score: 0)
+4. "You’re finding clarity and confidence in your choices." (Score: -1)
+
+### Uneasy:
+1. "Something doesn’t feel right, but I can’t put my finger on it." (Score: 1)
+2. "I’m feeling anxious and on edge about what’s ahead." (Score: 0.7)
+3. "Exploring what’s causing this feeling can bring understanding." (Score: 0)
+4. "You’re navigating uncertainty with calm and confidence." (Score: -1)
+
+### Unloved:
+1. "I feel invisible, like no one cares about me." (Score: 1)
+2. "It’s hard to believe that I matter to anyone right now." (Score: 0.8)
+3. "You are worthy of love and care, even when it’s hard to see." (Score: 0)
+4. "You’re surrounded by people who value and appreciate you." (Score: -1)
+
+### Unmotivated:
+1. "I just can’t find the drive to do anything." (Score: 1)
+2. "Nothing feels worth the effort right now." (Score: 0.7)
+3. "It’s okay to take a break and recharge your energy." (Score: 0)
+4. "You’re rediscovering your passion and purpose." (Score: -1)
+
+### Unworthy:
+1. "I feel like I’m not good enough for anything or anyone." (Score: 1)
+2. "Everything I do feels insignificant and inadequate." (Score: 0.7)
+3. "You have inherent value that goes beyond your achievements." (Score: 0)
+4. "You’re recognizing your worth and embracing your strengths." (Score: -1)
+
+### Vulnerable:
+1. "I feel so exposed, like anything could hurt me right now." (Score: 1)
+2. "It’s scary to let my guard down, even with people I trust." (Score: 0.7)
+3. "Vulnerability is a strength that fosters connection and growth." (Score: 0)
+4. "You’re embracing your courage to be open and authentic." (Score: -1)
+
+### Withdrawn:
+1. "I don’t want to be around anyone; I just need to be alone." (Score: 1)
+2. "It’s easier to keep to myself than to deal with others right now." (Score: 0.6)
+3. "Taking time for yourself can be a way to recharge." (Score: 0)
+4. "You’re finding your way back to connection and community." (Score: -1)
+
+### Worried:
+1. "I can’t stop thinking about everything that could go wrong." (Score: 1)
+2. "It feels like the weight of the world is on my shoulders." (Score: 0.7)
+3. "Worry shows how much you care about the outcome." (Score: 0)
+4. "You’re finding ways to focus on what you can control." (Score: -1)
+
+### Worthless:
+1. "I feel like I have no value, like I’m nothing to anyone." (Score: 1)
+2. "Everything I do seems pointless and meaningless." (Score: 0.8)
+3. "You matter deeply, even if it’s hard to see right now." (Score: 0)
+4. "You’re recognizing your unique value and the impact you have." (Score: -1)
+
+As provided in the sample context, your task is to evaluate the following statement: '{user_input}'. For each parameter in the list of emotions derived from the uploaded file, provide a score in the format 'Parameter: Score'. Evaluate the provided statement strictly in terms of the listed parameters. Provide only the parameter name followed by its score in the format 'Parameter: Score' for all the parameters provided in the uploaded file.
+
+If the subject of the text is inanimate objects such as materials, academic subjects, or food, assign a score of 0 to all parameters, as these categories are not applicable for judgment under the given parameters. If the statement refers to people, behaviors, or actions, evaluate the parameters appropriately based on the context.
+
+Ensure that all scores are numerical, and avoid using N/A or providing any explanations or additional comments. The output should be concise, listing only the parameter names and their corresponding numerical scores. For parameters that do not exist in the sentence, assign a score of 0. Do not include any explanations or additional comments. Instead of N/A, give 0. Give output for all the parameters, and all the scores must and must be between -1 and 1. Try to be as precise as you can in allocating the scores, using decimal scores in between -1 and 1 for non-extreme statements instead of 0.
+
+For each parameter in the list derived from the uploaded file, return its score strictly in the format:
+`parameter: score_parameter`
+
+You will strictly adhere to this format and return scores for all the parameters in the list parameters = ['Abandoned', 'Afraid', 'Alienated', 'Alone', 'Anguished', 'Annoyed', 'Anxious', 'Apathetic', 'Apologetic', 'Apprehensive', 'Ashamed', 'Awkward', 'Bitter', 'Blameworthy', 'Burned_Out', 'Concerned', 'Dejected', 'Demoralized', 'Despondent', 'Detached', 'Disconnected', 'Disheartened', 'Dissociative', 'Distraught', 'Doubtful', 'Drained', 'Dread', 'Edgy', 'Embarrassed', 'Emptiness', 'Enraged', 'Excluded', 'Exposed', 'Fatigued', 'Fearful', 'Forsaken', 'Frustrated', 'Furious', 'Gloomy', 'Heartbroken', 'Helpless', 'Hesitant', 'Hopeless', 'Hypervigilant', 'Indifferent', 'Insecure', 'Irritable', 'Isolated', 'Judged', 'Lethargic', 'Lost', 'Melancholy', 'Miserable', 'Misunderstood', 'Mourning', 'Nervous', 'Numb', 'Overwhelmed', 'Panicked', 'Paranoid', 'Pressured', 'Regretful', 'Remorseful', 'Resentful', 'Restless', 'Sad', 'Sarcasm', 'Scared', 'Secluded', 'Self_Critical', 'Shaky', 'Shy', 'Sorrowful', 'Startled', 'Stressed', 'Tense', 'Terrified', 'Tired', 'Triggered', 'Troubled', 'Uncertain', 'Uneasy', 'Unloved', 'Unmotivated', 'Unworthy', 'Vulnerable', 'Withdrawn', 'Worried', 'Worthless']
