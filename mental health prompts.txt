@@ -2070,6 +2070,75 @@ Sample context:
 20. "I’m proud of who I am and what I bring to the world." (Score: -0.9)
 21. "I feel valuable, appreciated, and full of purpose." (Score: -1)
 
+#### Suicidal:
+1. "I don’t see any point in living anymore." (Score: 1)
+2. "I feel like ending it all would be easier." (Score: 0.9)
+3. "I’m overwhelmed by thoughts of self-harm." (Score: 0.8)
+4. "Life feels unbearable and hopeless." (Score: 0.7)
+5. "I keep thinking everyone would be better off without me." (Score: 0.6)
+6. "I’m struggling to find reasons to stay alive." (Score: 0.5)
+7. "The idea of disappearing seems comforting." (Score: 0.4)
+8. "It feels like there’s no escape from my pain." (Score: 0.3)
+9. "I can’t stop imagining a way out of this suffering." (Score: 0.2)
+10. "Sometimes, I wonder if I’ll ever feel okay again." (Score: 0.1)
+11. "I’m seeking help to understand my thoughts." (Score: 0)
+12. "I’m beginning to share my feelings with others." (Score: -0.1)
+13. "I’m finding glimmers of hope despite the darkness." (Score: -0.2)
+14. "I’ve started recognizing the value of my life." (Score: -0.3)
+15. "I’m learning to cope with my struggles more effectively." (Score: -0.4)
+16. "I’m grateful for the support I’ve found." (Score: -0.5)
+17. "I’m focusing on the things that bring me joy." (Score: -0.6)
+18. "I’m rediscovering reasons to keep going." (Score: -0.7)
+19. "I’m embracing the possibility of a brighter future." (Score: -0.8)
+20. "I’m feeling hopeful and stronger each day." (Score: -0.9)
+21. "I’m grateful for my life and the people in it." (Score: -1)
+
+#### Depressed:
+1. "I feel stuck in a constant state of sadness." (Score: 1)
+2. "Nothing brings me joy anymore." (Score: 0.9)
+3. "I’m overwhelmed by a sense of hopelessness." (Score: 0.8)
+4. "Every day feels like a struggle to get through." (Score: 0.7)
+5. "I’ve lost interest in everything I used to enjoy." (Score: 0.6)
+6. "Even small tasks feel impossible to accomplish." (Score: 0.5)
+7. "I feel numb and disconnected from the world." (Score: 0.4)
+8. "My emotions feel heavy and unmanageable." (Score: 0.3)
+9. "I’m consumed by negative thoughts." (Score: 0.2)
+10. "Some days, I can’t find the energy to care." (Score: 0.1)
+11. "I’m starting to understand my feelings better." (Score: 0)
+12. "I’m taking small steps to feel better." (Score: -0.1)
+13. "I’ve found moments of peace in my day." (Score: -0.2)
+14. "I’m reconnecting with things I used to love." (Score: -0.3)
+15. "I’m focusing on self-care and healing." (Score: -0.4)
+16. "I’m feeling lighter as I let go of the sadness." (Score: -0.5)
+17. "I’ve started to rediscover my passion for life." (Score: -0.6)
+18. "I’m building positive habits to improve my mood." (Score: -0.7)
+19. "I feel more hopeful and motivated each day." (Score: -0.8)
+20. "I’ve found happiness in the small moments." (Score: -0.9)
+21. "I feel content and grateful for my life." (Score: -1)
+
+#### Self_harm:
+1. "I’m actively hurting myself to cope." (Score: 1)
+2. "I feel a need to harm myself to relieve the pain." (Score: 0.9)
+3. "The urge to self-harm is overwhelming." (Score: 0.8)
+4. "I’ve been struggling to stop hurting myself." (Score: 0.7)
+5. "Self-harm feels like the only way to release my emotions." (Score: 0.6)
+6. "I’m relying on self-harm to feel some control." (Score: 0.5)
+7. "I can’t seem to resist the urge to self-harm." (Score: 0.4)
+8. "The thought of self-harm keeps crossing my mind." (Score: 0.3)
+9. "I’m scared of how often I think about hurting myself." (Score: 0.2)
+10. "I’m trying to fight the urge to harm myself." (Score: 0.1)
+11. "I’m reaching out for help to stop self-harming." (Score: 0)
+12. "I’m starting to find healthier ways to cope." (Score: -0.1)
+13. "I’ve gone some time without self-harming." (Score: -0.2)
+14. "I’m proud of myself for resisting the urge." (Score: -0.3)
+15. "I’ve started using positive distractions to avoid self-harm." (Score: -0.4)
+16. "I’m learning to process my emotions without self-harm." (Score: -0.5)
+17. "I’m building a support system to help me cope." (Score: -0.6)
+18. "I’ve found healthier outlets for my emotions." (Score: -0.7)
+19. "I’m feeling more in control of my coping mechanisms." (Score: -0.8)
+20. "I’ve learned to care for myself without self-harm." (Score: -0.9)
+21. "I feel free from the cycle of self-harm and stronger than ever." (Score: -1)
+
 As provided in the sample context, your task is to evaluate the following statement: '{user_input}'. For each parameter in the list of emotions derived from the uploaded file, provide a score in the format 'Parameter: Score'. Evaluate the provided statement strictly in terms of the listed parameters. Provide only the parameter name followed by its score in the format 'Parameter: Score' for all the parameters provided in the uploaded file.
 
 If the subject of the text is inanimate objects such as materials, academic subjects, or food, assign a score of 0 to all parameters, as these categories are not applicable for judgment under the given parameters. If the statement refers to people, behaviors, or actions, evaluate the parameters appropriately based on the context.
@@ -2079,4 +2148,4 @@ Ensure that all scores are numerical, and avoid using N/A or providing any expla
 For each parameter in the list derived from the uploaded file, return its score strictly in the format:
 `parameter: score_parameter`
 
-You will strictly adhere to this format and return scores for all the parameters in the list parameters = ['Abandoned', 'Afraid', 'Alienated', 'Alone', 'Anguished', 'Annoyed', 'Anxious', 'Apathetic', 'Apologetic', 'Apprehensive', 'Ashamed', 'Awkward', 'Bitter', 'Blameworthy', 'Burned_Out', 'Concerned', 'Dejected', 'Demoralized', 'Despondent', 'Detached', 'Disconnected', 'Disheartened', 'Dissociative', 'Distraught', 'Doubtful', 'Drained', 'Dread', 'Edgy', 'Embarrassed', 'Emptiness', 'Enraged', 'Excluded', 'Exposed', 'Fatigued', 'Fearful', 'Forsaken', 'Frustrated', 'Furious', 'Gloomy', 'Heartbroken', 'Helpless', 'Hesitant', 'Hopeless', 'Hypervigilant', 'Indifferent', 'Insecure', 'Irritable', 'Isolated', 'Judged', 'Lethargic', 'Lost', 'Melancholy', 'Miserable', 'Misunderstood', 'Mourning', 'Nervous', 'Numb', 'Overwhelmed', 'Panicked', 'Paranoid', 'Pressured', 'Regretful', 'Remorseful', 'Resentful', 'Restless', 'Sad', 'Sarcasm', 'Scared', 'Secluded', 'Self_Critical', 'Shaky', 'Shy', 'Sorrowful', 'Startled', 'Stressed', 'Tense', 'Terrified', 'Tired', 'Triggered', 'Troubled', 'Uncertain', 'Uneasy', 'Unloved', 'Unmotivated', 'Unworthy', 'Vulnerable', 'Withdrawn', 'Worried', 'Worthless']
+You will strictly adhere to this format and return scores for all the parameters in the list parameters = ['Abandoned', 'Afraid', 'Alienated', 'Alone', 'Anguished', 'Annoyed', 'Anxious', 'Apathetic', 'Apologetic', 'Apprehensive', 'Ashamed', 'Awkward', 'Bitter', 'Blameworthy', 'Burned_Out', 'Concerned', 'Dejected', 'Demoralized', 'Despondent', 'Detached', 'Disconnected', 'Disheartened', 'Dissociative', 'Distraught', 'Doubtful', 'Drained', 'Dread', 'Edgy', 'Embarrassed', 'Emptiness', 'Enraged', 'Excluded', 'Exposed', 'Fatigued', 'Fearful', 'Forsaken', 'Frustrated', 'Furious', 'Gloomy', 'Heartbroken', 'Helpless', 'Hesitant', 'Hopeless', 'Hypervigilant', 'Indifferent', 'Insecure', 'Irritable', 'Isolated', 'Judged', 'Lethargic', 'Lost', 'Melancholy', 'Miserable', 'Misunderstood', 'Mourning', 'Nervous', 'Numb', 'Overwhelmed', 'Panicked', 'Paranoid', 'Pressured', 'Regretful', 'Remorseful', 'Resentful', 'Restless', 'Sad', 'Sarcasm', 'Scared', 'Secluded', 'Self_Critical', 'Shaky', 'Shy', 'Sorrowful', 'Startled', 'Stressed', 'Tense', 'Terrified', 'Tired', 'Triggered', 'Troubled', 'Uncertain', 'Uneasy', 'Unloved', 'Unmotivated', 'Unworthy', 'Vulnerable', 'Withdrawn', 'Worried', 'Worthless', 'Suicidal', 'Depressed', 'Self_harm']

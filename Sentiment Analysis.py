@@ -954,7 +954,7 @@ def main():
                 'Regretful', 'Remorseful', 'Resentful', 'Restless', 'Sad', 'Sarcasm', 'Scared', 'Secluded', 
                 'Self_Critical', 'Shaky', 'Shy', 'Sorrowful', 'Startled', 'Stressed', 'Tense', 'Terrified', 
                 'Tired', 'Triggered', 'Troubled', 'Uncertain', 'Uneasy', 'Unloved', 'Unmotivated', 
-                'Unworthy', 'Vulnerable', 'Withdrawn', 'Worried', 'Worthless'
+                'Unworthy', 'Vulnerable', 'Withdrawn', 'Worried', 'Worthless', 'Suicidal', 'Self_harm'
             ],
             metricName="distress"
         )
