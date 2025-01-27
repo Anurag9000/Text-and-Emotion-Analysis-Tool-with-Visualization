@@ -440,14 +440,14 @@ class ImpactProcessor:
 
                 response_lines = response["message"]["content"].split("\n")
                 paramScores = {param: 0 for param in self.parameters}
-
                 for line in response_lines:
                     if ":" in line:
                         try:
                             param, value = line.split(":", 1)
                             param = param.strip()
                             value = float(value.strip())
-                            if param in paramScores or param.lower() in paramScores:
+                            param = re.sub(r'[^a-zA-Z\s]', '', param)
+                            if param in paramScores or param.lower() in paramScores or param.upper() in paramScores or param.title() in paramScores:
                                 paramScores[param] = value
                         except ValueError:
                             print(f"Skipping malformed line: {line}")
