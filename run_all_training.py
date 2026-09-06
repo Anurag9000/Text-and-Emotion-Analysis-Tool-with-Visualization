@@ -5,8 +5,8 @@ import hashlib, json, os, subprocess, sys, urllib.request
 from pathlib import Path
 
 REPOSITORY = "Anurag9000/Text-and-Emotion-Analysis-Tool-with-Visualization"
-CONTROLLER_COMMIT = "a3d25bd282d8e2e0d9f2cb3730d4d036703a39ad"
-CONTROLLER_BLOB = "2515a8a2fc2dbed7334a4240438dc095f19636d2"
+CONTROLLER_COMMIT = "7b9ceb12d6c5fdef33eefd73eaea4c027b941737"
+CONTROLLER_BLOB = "4ecb86674c3baa91c88ff57a8699decce26c528d"
 SOURCE = f"https://raw.githubusercontent.com/Anurag9000/RigorousRAG/{CONTROLLER_COMMIT}/tools/universal_training_controller_entry.py"
 ROOT = Path(__file__).resolve().parent
 PROFILE = {
