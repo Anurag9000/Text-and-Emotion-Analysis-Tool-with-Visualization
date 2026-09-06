@@ -1,33 +1,14 @@
 #!/usr/bin/env python3
-"""One-command exhaustive training entrypoint for this repository."""
 from __future__ import annotations
-import hashlib, json, os, subprocess, sys, urllib.request
+import hashlib,os,subprocess,sys,urllib.request
 from pathlib import Path
-
-REPOSITORY = "Anurag9000/Text-and-Emotion-Analysis-Tool-with-Visualization"
-CONTROLLER_COMMIT = "7b9ceb12d6c5fdef33eefd73eaea4c027b941737"
-CONTROLLER_BLOB = "4ecb86674c3baa91c88ff57a8699decce26c528d"
-SOURCE = f"https://raw.githubusercontent.com/Anurag9000/RigorousRAG/{CONTROLLER_COMMIT}/tools/universal_training_controller_entry.py"
-ROOT = Path(__file__).resolve().parent
-PROFILE = {
-    "repository": REPOSITORY,
-    "preferred_training_entrypoints": ["train.py","training.py","run_training.py","scripts/train.py","scripts/train_all.py","scripts/run_training.py"],
-    "preferred_dataset_entrypoints": ["prepare_data.py","scripts/prepare_data.py","scripts/download_data.py","scripts/materialize_datasets.py","scripts/dataset_setup.py"],
-    "dynamic_registry_covers": [], "extra_jobs": [], "ignore_entrypoints": ["run_all_training.py"],
-    "strict_coverage": True, "require_native_resume": True, "require_exact_resume": True,
-    "require_training_exact_resume": True, "require_training_early_stopping": True,
-    "require_dag_enforcement": True, "require_model_surface_accounting": True,
-    "require_literal_opf_mechanism_parity": True, "require_well_formed_training_exemptions": True,
-}
-
-def _sha(data: bytes) -> str: return hashlib.sha1(f"blob {len(data)}\0".encode() + data).hexdigest()
-def main() -> int:
-    cache = ROOT / ".training_control" / "universal_training_controller_entry.py"
-    if not cache.is_file() or _sha(cache.read_bytes()) != CONTROLLER_BLOB:
-        cache.parent.mkdir(parents=True, exist_ok=True)
-        data = urllib.request.urlopen(SOURCE, timeout=60).read()
-        if _sha(data) != CONTROLLER_BLOB: raise RuntimeError("Pinned training controller checksum mismatch")
-        tmp = cache.with_suffix(".tmp"); tmp.write_bytes(data); os.replace(tmp, cache)
-    env = os.environ.copy(); env["TRAINING_CONTROL_PROFILE"] = json.dumps(PROFILE, separators=(",",":")); env["TRAINING_CONTROL_REPO_ROOT"] = str(ROOT); env.setdefault("TRAINING_CONTROL_TERMINATION_GRACE_SEC", "30")
-    return subprocess.call([sys.executable, str(cache), *sys.argv[1:]], cwd=ROOT, env=env)
-if __name__ == "__main__": raise SystemExit(main())
+R="Anurag9000/Text-and-Emotion-Analysis-Tool-with-Visualization";B="10416518dc255147faba5da93ee570164bb8e3c7";S="9e4e955bd69099561144a75fdcca34af10ea8671";AC="dd3043cd8a36d50c03e5cfc27a17d58a74aa7bec";AS="c16610e877541342f71c9925aa9d83f636df52f7";D=Path(__file__).resolve().parent;U=f"https://raw.githubusercontent.com/Anurag9000/RigorousRAG/{AC}/tools/repo_training_launcher_adapter.py"
+def h(x):return hashlib.sha1(f"blob {len(x)}\0".encode()+x).hexdigest()
+def main():
+ p=D/".training_control"/"repo_training_launcher_adapter.py"
+ if not p.is_file() or h(p.read_bytes())!=AS:
+  p.parent.mkdir(parents=True,exist_ok=True);x=urllib.request.urlopen(U,timeout=60).read()
+  if h(x)!=AS:raise RuntimeError("Pinned launcher adapter checksum mismatch")
+  t=p.with_suffix(".tmp");t.write_bytes(x);os.replace(t,p)
+ e=os.environ.copy();e["TRAINING_LAUNCHER_BASE_REPOSITORY"]=R;e["TRAINING_LAUNCHER_BASE_COMMIT"]=B;e["TRAINING_LAUNCHER_BASE_BLOB"]=S;e["TRAINING_CONTROL_REPO_ROOT"]=str(D);return subprocess.call([sys.executable,str(p),*sys.argv[1:]],cwd=D,env=e)
+if __name__=="__main__":raise SystemExit(main())
