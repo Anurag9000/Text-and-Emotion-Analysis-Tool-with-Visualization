@@ -2,7 +2,7 @@
 from __future__ import annotations
 import hashlib,os,subprocess,sys,urllib.request
 from pathlib import Path
-R="Anurag9000/Text-and-Emotion-Analysis-Tool-with-Visualization";B="10416518dc255147faba5da93ee570164bb8e3c7";S="9e4e955bd69099561144a75fdcca34af10ea8671";AC="5ff5db05815f2ef9dff9616952156de3aae93338";AS="3909e826c4054932fc188914a983dac823c0171c";D=Path(__file__).resolve().parent;U=f"https://raw.githubusercontent.com/Anurag9000/RigorousRAG/{AC}/tools/repo_training_launcher_adapter.py"
+R="Anurag9000/Text-and-Emotion-Analysis-Tool-with-Visualization";B="10416518dc255147faba5da93ee570164bb8e3c7";S="9e4e955bd69099561144a75fdcca34af10ea8671";AC="f899ac190085228cc95f47725a36bfd105822374";AS="82a10e0a6e221dbf90de92d56a8b87d0f270935f";D=Path(__file__).resolve().parent;U=f"https://raw.githubusercontent.com/Anurag9000/RigorousRAG/{AC}/tools/repo_training_launcher_adapter.py"
 def h(x):return hashlib.sha1(f"blob {len(x)}\0".encode()+x).hexdigest()
 def main():
  p=D/".training_control"/"repo_training_launcher_adapter.py"
