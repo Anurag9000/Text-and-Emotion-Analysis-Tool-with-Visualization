@@ -1,79 +1,31 @@
 name: Estate local training-control certificate
-
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'run_all_training.py'
-      - 'training_control/**'
-      - 'scripts/**'
-      - 'src/**'
-      - '.github/workflows/estate-training-control-local.yml'
+  push: {branches: [main]}
   workflow_dispatch:
-
-permissions:
-  contents: read
-
+permissions: {contents: read}
 jobs:
-  local-authority:
+  certificate:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+        with: {fetch-depth: 0}
       - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Verify first-class authority, immutable pins, topology and syntax
-        env:
-          GH_TOKEN: ${{ github.token }}
+        with: {python-version: '3.11'}
+      - name: Fetch exact canonical repository validator
         run: |
           python - <<'PY'
-          import hashlib, json, os, py_compile, urllib.request
+          import hashlib,urllib.request
           from pathlib import Path
-          repo = os.environ['GITHUB_REPOSITORY']
-          token = os.environ['GH_TOKEN']
-          root = Path.cwd()
-          launcher = root / 'run_all_training.py'
-          if not launcher.is_file(): raise SystemExit('missing run_all_training.py')
-          text = launcher.read_text(encoding='utf-8')
-          for marker in ('scientific_authority','require_literal_opf_mechanism_parity','require_all_retained_trainable_source_reachability','strict_coverage'):
-              if marker not in text: raise SystemExit(f'missing root authority marker: {marker}')
-          for forbidden in ('TRAINING_LAUNCHER_BASE_COMMIT','repo_training_launcher_adapter.py'):
-              if forbidden in text: raise SystemExit(f'opaque preservation adapter remains: {forbidden}')
-          commit='fd34a95d18892df7fb14d1efbb99076a7810fb91'; blob='05ef472b29933f18e956c69dfb7e543921ddaff5'; opf='1d1dfbbf7521ac40ee60c1f78f84956bf5f70598'
-          if repo != 'Anurag9000/RigorousRAG' and (commit not in text or blob not in text): raise SystemExit('root is not pinned to canonical v37')
-          def req(url):
-              r=urllib.request.Request(url,headers={'Accept':'application/vnd.github+json','Authorization':f'Bearer {token}','User-Agent':'estate-local-training-control/1'}); return json.load(urllib.request.urlopen(r,timeout=60))
-          meta=req(f'https://api.github.com/repos/{repo}')
-          if meta.get('default_branch')!='main': raise SystemExit(f"default branch is {meta.get('default_branch')!r}, not main")
-          branches=[]; page=1
-          while True:
-              rows=req(f'https://api.github.com/repos/{repo}/branches?per_page=100&page={page}')
-              branches += [str(row['name']) for row in rows]
-              if len(rows)<100: break
-              page += 1
-          extra=sorted(set(branches)-{'main'})
-          if extra: raise SystemExit(f'extra branch refs remain: {extra}')
-          live=req('https://api.github.com/repos/Anurag9000/OPF_ADP/commits/main')['sha']
-          if live!=opf: raise SystemExit(f'OPF_ADP main drifted: {live} != {opf}')
-          raw=urllib.request.urlopen(f'https://raw.githubusercontent.com/Anurag9000/RigorousRAG/{commit}/tools/universal_training_controller_entry.py',timeout=60).read()
-          actual=hashlib.sha1(f'blob {len(raw)}\0'.encode()+raw).hexdigest()
-          if actual!=blob: raise SystemExit(f'v37 bootstrap blob drifted: {actual} != {blob}')
-          excluded={'.git','.venv','venv','node_modules','vendor','third_party','build','dist','artifacts','runs','outputs','data','datasets'}
-          compiled=0
-          for path in root.rglob('*.py'):
-              if excluded.intersection(path.parts): continue
-              py_compile.compile(str(path),doraise=True); compiled += 1
-          out=root/'.training_control'/'local_estate_certificate.json'; out.parent.mkdir(parents=True,exist_ok=True)
-          out.write_text(json.dumps({'schema':1,'repository':repo,'scientific_authority':True,'canonical_v37':True,'opf_main':live,'branches':branches,'compiled_python_files':compiled,'pass':True},indent=2,sort_keys=True)+'\n',encoding='utf-8')
-          print(out.read_text())
+          c='1cd24a744054a480b4882eeb72308074ce5f9304'; e='42e6fee5c30b12fb3a502d89288c1f7c71cf6533'; d=urllib.request.urlopen(f'https://raw.githubusercontent.com/Anurag9000/RigorousRAG/{c}/tools/repository_local_estate_certificate.py',timeout=60).read(); a=hashlib.sha1(f'blob {len(d)}\0'.encode()+d).hexdigest()
+          if a!=e: raise SystemExit(f'validator blob mismatch: {a} != {e}')
+          p=Path('.training_control/canonical_repository_local_estate_certificate.py');p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(d)
           PY
+      - name: Certify this repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python .training_control/canonical_repository_local_estate_certificate.py --repository "$GITHUB_REPOSITORY" --root . --output .training_control/local_estate_certificate.json
       - uses: actions/upload-artifact@v4
         if: always()
-        with:
-          name: estate-local-training-control-${{ github.sha }}
-          path: .training_control/local_estate_certificate.json
-          if-no-files-found: warn
-          retention-days: 30
+        with: {name: 'estate-local-training-control-${{ github.sha }}', path: .training_control/local_estate_certificate.json, if-no-files-found: warn, retention-days: 30}
