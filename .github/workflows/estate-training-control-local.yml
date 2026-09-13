@@ -17,14 +17,11 @@ jobs:
           python - <<'PY'
           import hashlib,urllib.request
           from pathlib import Path
-          c='51b8e06cf9d9391182c3e130599b7e5f833f4fa4'; e='08459196d5419499ec2769994cebad9fb043d680'; d=urllib.request.urlopen(f'https://raw.githubusercontent.com/Anurag9000/RigorousRAG/{c}/tools/repository_local_estate_certificate.py',timeout=60).read(); a=hashlib.sha1(f'blob {len(d)}\0'.encode()+d).hexdigest()
+          c='2b5b396696e2f81c98a1a9861d2f0e9cc157fdcb'; e='ac684a407049b0272e91df97e0de72b4c318c48d'; d=urllib.request.urlopen(f'https://raw.githubusercontent.com/Anurag9000/RigorousRAG/{c}/tools/repository_local_estate_certificate.py',timeout=60).read(); a=hashlib.sha1(f'blob {len(d)}\0'.encode()+d).hexdigest()
           if a!=e: raise SystemExit(f'validator blob mismatch: {a} != {e}')
           p=Path('.training_control/canonical_repository_local_estate_certificate.py');p.parent.mkdir(parents=True,exist_ok=True);p.write_bytes(d)
           PY
       - name: Certify this repository
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_TOKEN: ${{ github.token }}
         run: python .training_control/canonical_repository_local_estate_certificate.py --repository "$GITHUB_REPOSITORY" --root . --output .training_control/local_estate_certificate.json
       - uses: actions/upload-artifact@v4
         if: always()
