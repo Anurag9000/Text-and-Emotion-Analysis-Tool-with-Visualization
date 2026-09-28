@@ -30,13 +30,13 @@ REQUIRED_INFERENCE_FILES = (
 )
 TEXTUAL_SUFFIXES = {".txt", ".md"}
 TEXT_TRAINING_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
-    ("torch_optim", re.compile(r"\\btorch\\.optim(?:\\.|\\b)", re.I)),
-    ("keras_optimizer", re.compile(r"\\b(?:tensorflow\\.)?keras\\.optimizers(?:\\.|\\b)", re.I)),
-    ("backward_call", re.compile(r"\\.backward\\s*\\(", re.I)),
-    ("fit_call", re.compile(r"\\.(?:partial_)?fit\\s*\\(", re.I)),
-    ("trainer_constructor", re.compile(r"\\b(?:Seq2Seq)?Trainer\\s*\\(")),
-    ("training_arguments", re.compile(r"\\bTrainingArguments\\s*\\(")),
-    ("optimizer_constructor", re.compile(r"\\b(?:AdamW?|SGD|RMSprop|Adagrad|Adadelta|LBFGS|SparseAdam)\\s*\\(")),
+    ("torch_optim", re.compile(r"\btorch\.optim(?:\.|\b)", re.I)),
+    ("keras_optimizer", re.compile(r"\b(?:tensorflow\.)?keras\.optimizers(?:\.|\b)", re.I)),
+    ("backward_call", re.compile(r"\.backward\s*\(", re.I)),
+    ("fit_call", re.compile(r"\.(?:partial_)?fit\s*\(", re.I)),
+    ("trainer_constructor", re.compile(r"\b(?:Seq2Seq)?Trainer\s*\(")),
+    ("training_arguments", re.compile(r"\bTrainingArguments\s*\(")),
+    ("optimizer_constructor", re.compile(r"\b(?:AdamW?|SGD|RMSprop|Adagrad|Adadelta|LBFGS|SparseAdam)\s*\(")),
 )
 
 
