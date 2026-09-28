@@ -14,6 +14,7 @@ training, benchmark execution, or dataset validation occurred.
 from __future__ import annotations
 
 import ast
+import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
@@ -21,6 +22,23 @@ from typing import Iterable
 ROOT = Path(__file__).resolve().parents[1]
 EXCLUDED_PARTS = {".git", ".training_control", "__pycache__", ".venv", "venv", "build", "dist"}
 EXCLUDED_FILES = {"run_all_training.py", "training_control/no_trainable_surface_v1.py"}
+REQUIRED_INFERENCE_FILES = (
+    "Sentiment Analysis.py",
+    "Sentiment Analysis (Stable last code).py",
+    "Host llama locally.py",
+    "inference_device_policy.py",
+)
+TEXTUAL_SUFFIXES = {".txt", ".md"}
+TEXT_TRAINING_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("torch_optim", re.compile(r"\\btorch\\.optim(?:\\.|\\b)", re.I)),
+    ("keras_optimizer", re.compile(r"\\b(?:tensorflow\\.)?keras\\.optimizers(?:\\.|\\b)", re.I)),
+    ("backward_call", re.compile(r"\\.backward\\s*\\(", re.I)),
+    ("fit_call", re.compile(r"\\.(?:partial_)?fit\\s*\\(", re.I)),
+    ("trainer_constructor", re.compile(r"\\b(?:Seq2Seq)?Trainer\\s*\\(")),
+    ("training_arguments", re.compile(r"\\bTrainingArguments\\s*\\(")),
+    ("optimizer_constructor", re.compile(r"\\b(?:AdamW?|SGD|RMSprop|Adagrad|Adadelta|LBFGS|SparseAdam)\\s*\\(")),
+)
+
 
 TRAINING_ATTRS = {
     "fit", "fit_generator", "partial_fit", "train_on_batch", "backward", "zero_grad",
@@ -105,10 +123,27 @@ def retained_python_files() -> tuple[Path, ...]:
     return tuple(sorted(files))
 
 
+def retained_text_files() -> tuple[Path, ...]:
+    files: list[Path] = []
+    for path in ROOT.rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in TEXTUAL_SUFFIXES:
+            continue
+        relative = path.relative_to(ROOT).as_posix()
+        if any(part in EXCLUDED_PARTS for part in path.relative_to(ROOT).parts):
+            continue
+        files.append(path)
+    return tuple(sorted(files))
+
+
 def audit() -> dict[str, object]:
     findings: list[Finding] = []
     parse_errors: list[dict[str, object]] = []
     files = retained_python_files()
+    text_files = retained_text_files()
+    missing_required = [
+        relative for relative in REQUIRED_INFERENCE_FILES
+        if not (ROOT / relative).is_file()
+    ]
     for path in files:
         try:
             tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"), filename=str(path))
@@ -125,7 +160,23 @@ def audit() -> dict[str, object]:
         scanner.visit(tree)
         findings.extend(scanner.findings)
 
+    for path in text_files:
+        relative = path.relative_to(ROOT).as_posix()
+        for line_number, line in enumerate(
+            path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
+        ):
+            for kind, pattern in TEXT_TRAINING_PATTERNS:
+                if pattern.search(line):
+                    findings.append(
+                        Finding(relative, line_number, "textual_" + kind, line.strip()[:240])
+                    )
+
     unresolved: list[dict[str, object]] = []
+    if missing_required:
+        unresolved.append({
+            "type": "required_inference_source_missing",
+            "values": missing_required,
+        })
     if parse_errors:
         unresolved.append({"type": "python_parse_errors", "values": parse_errors})
     if findings:
@@ -141,6 +192,9 @@ def audit() -> dict[str, object]:
         "repository": "Anurag9000/Text-and-Emotion-Analysis-Tool-with-Visualization",
         "classification": "inference_and_data_processing_only" if not unresolved else "training_surface_detected",
         "retained_python_files": [path.relative_to(ROOT).as_posix() for path in files],
+        "retained_text_files": [path.relative_to(ROOT).as_posix() for path in text_files],
+        "required_inference_files": list(REQUIRED_INFERENCE_FILES),
+        "missing_required_inference_files": missing_required,
         "training_findings": [asdict(row) for row in findings],
         "parse_errors": parse_errors,
         "unresolved": unresolved,
