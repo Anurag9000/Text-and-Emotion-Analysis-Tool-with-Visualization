@@ -14,6 +14,7 @@ import os
 import torch
 import pymysql
 import csv
+from application_config import database_config_from_env
 from inference_device_policy import (
     best_cuda_index,
     gpu_admission_requested,
@@ -990,12 +991,7 @@ def main():
 
     try:
         # Initialize MySQL DatabaseHandler
-        db_handler = DatabaseHandler(
-            host='localhost',  # Replace with your MySQL host, e.g., 'localhost'
-            user='root',  # Replace with your MySQL username
-            password='1Anurag2Basistha',  # Replace with your MySQL password
-            database='SentimentAnalysis'  # Replace with your MySQL database name
-        )
+        db_handler = DatabaseHandler(**database_config_from_env())
 
         # Connect to the MySQL database
         db_handler.connect()
