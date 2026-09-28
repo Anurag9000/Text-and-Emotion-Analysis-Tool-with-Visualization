@@ -26,11 +26,13 @@ jobs:
           python -m py_compile \
             run_all_training.py \
             inference_device_policy.py \
+            application_config.py \
             training_control/no_trainable_surface_v1.py \
             test_inference_device_policy.py \
-            test_inference_only_authority.py
+            test_inference_only_authority.py \
+            test_application_config.py
       - name: Regress CPU admission and inference-only source completeness
-        run: python -m unittest -v test_inference_device_policy test_inference_only_authority
+        run: python -m unittest -v test_inference_device_policy test_inference_only_authority test_application_config
       - name: Audit exhaustive training closure and recovery contracts
         run: python run_all_training.py --training-control-audit
       - name: Upload training-control certificate
