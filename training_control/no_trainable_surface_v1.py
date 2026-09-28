@@ -26,6 +26,7 @@ REQUIRED_INFERENCE_FILES = (
     "Sentiment Analysis.py",
     "Sentiment Analysis (Stable last code).py",
     "Host llama locally.py",
+    "application_config.py",
     "inference_device_policy.py",
 )
 TEXTUAL_SUFFIXES = {".txt", ".md"}
