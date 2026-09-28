@@ -1,0 +1,144 @@
+from __future__ import annotations
+
+import ast
+import os
+import types
+import unittest
+from pathlib import Path
+from unittest import mock
+
+import inference_device_policy as policy
+
+
+ROOT = Path(__file__).resolve().parent
+APP_FILES = ("Sentiment Analysis.py", "Sentiment Analysis (Stable last code).py")
+
+
+class Device:
+    def __init__(self, value):
+        self.name = str(value)
+        self.type = self.name.split(":", 1)[0]
+        self.index = int(self.name.split(":", 1)[1]) if ":" in self.name else None
+
+    def __str__(self):
+        return self.name
+
+
+def fake_torch(*, available=True, count=2, reserved=(10, 20), totals=(100, 200), fail=()):
+    module = types.SimpleNamespace()
+    module.device = Device
+    probes = {}
+
+    def empty(shape, *, device):
+        index = int(str(device).split(":", 1)[1])
+        if index in fail:
+            raise RuntimeError("allocation failed")
+        probe = types.SimpleNamespace(fill_=mock.Mock())
+        probes[index] = probe
+        return probe
+
+    module.empty = mock.Mock(side_effect=empty)
+    module.cuda = types.SimpleNamespace(
+        is_available=mock.Mock(return_value=available),
+        device_count=mock.Mock(return_value=count),
+        synchronize=mock.Mock(),
+        get_device_properties=mock.Mock(
+            side_effect=lambda i: types.SimpleNamespace(total_memory=totals[i])
+        ),
+        memory_reserved=mock.Mock(side_effect=lambda i: reserved[i]),
+    )
+    return module, probes
+
+
+class InferenceDevicePolicyTests(unittest.TestCase):
+    def test_cpu_admission_aliases_preempt_all_cuda_calls(self):
+        cases = (
+            {"CPU_ONLY": "1", "CUDA_VISIBLE_DEVICES": "0"},
+            {"TRAINING_CONTROL_CPU_ONLY": "yes", "CUDA_VISIBLE_DEVICES": "0"},
+            {"OPF_ADP_DISABLE_GPU_ACCELERATORS": "on"},
+            {"TRAINING_CONTROL_BACKEND": "cpu", "CUDA_VISIBLE_DEVICES": "0"},
+            {"CUDA_VISIBLE_DEVICES": ""},
+            {"CUDA_VISIBLE_DEVICES": " -1 "},
+        )
+        for env in cases:
+            with self.subTest(env=env):
+                torch, _ = fake_torch()
+                self.assertEqual(policy.best_cuda_index(torch, env), -1)
+                self.assertEqual(str(policy.resolve_torch_device(torch, env)), "cpu")
+                torch.cuda.is_available.assert_not_called()
+                torch.cuda.device_count.assert_not_called()
+                torch.empty.assert_not_called()
+
+    def test_conflicting_scheduler_admission_fails_before_probe(self):
+        torch, _ = fake_torch()
+        with self.assertRaisesRegex(RuntimeError, "conflicting CPU and GPU"):
+            policy.best_cuda_index(
+                torch, {"TRAINING_CONTROL_BACKEND": "gpu", "CPU_ONLY": "1"}
+            )
+        torch.cuda.is_available.assert_not_called()
+        torch.empty.assert_not_called()
+
+    def test_best_cuda_index_requires_real_operation_and_uses_local_free_memory(self):
+        torch, probes = fake_torch(reserved=(50, 20), totals=(100, 200))
+        env = {"CUDA_VISIBLE_DEVICES": "4,7"}
+        self.assertEqual(policy.best_cuda_index(torch, env), 1)
+        self.assertEqual(torch.empty.call_count, 2)
+        probes[0].fill_.assert_called_once_with(1)
+        probes[1].fill_.assert_called_once_with(1)
+        self.assertEqual(
+            [call.args[0] for call in torch.cuda.synchronize.call_args_list], [0, 1]
+        )
+        # Torch sees local masked indices; never reinterpret them as physical 4/7.
+        self.assertEqual(
+            [call.kwargs["device"] for call in torch.empty.call_args_list],
+            ["cuda:0", "cuda:1"],
+        )
+
+    def test_failed_device_probe_is_skipped_not_selected_by_memory(self):
+        torch, probes = fake_torch(fail=(1,), reserved=(90, 0), totals=(100, 1000))
+        self.assertEqual(policy.best_cuda_index(torch, {}), 0)
+        self.assertIn(0, probes)
+        self.assertNotIn(1, probes)
+
+    def test_gpu_admitted_child_cannot_silently_fall_back(self):
+        torch, _ = fake_torch(available=False)
+        with self.assertRaisesRegex(RuntimeError, "GPU-admitted inference worker"):
+            policy.resolve_torch_device(
+                torch,
+                {"TRAINING_CONTROL_BACKEND": "gpu", "CUDA_VISIBLE_DEVICES": "0"},
+            )
+        torch.empty.assert_not_called()
+
+    def test_standalone_unusable_cuda_falls_back_to_cpu(self):
+        torch, _ = fake_torch(available=True, count=1, fail=(0,), reserved=(0,), totals=(1,))
+        self.assertEqual(
+            str(policy.resolve_torch_device(torch, {"CUDA_VISIBLE_DEVICES": "0"})),
+            "cpu",
+        )
+
+    def test_transformers_device_convention(self):
+        self.assertEqual(policy.transformers_pipeline_device(Device("cpu")), -1)
+        self.assertEqual(policy.transformers_pipeline_device(Device("cuda")), 0)
+        self.assertEqual(policy.transformers_pipeline_device(Device("cuda:3")), 3)
+
+    def test_both_retained_apps_use_one_resolved_device_without_direct_cuda_probe(self):
+        for name in APP_FILES:
+            source = (ROOT / name).read_text(encoding="utf-8")
+            tree = ast.parse(source)
+            self.assertIn("from inference_device_policy import", source, name)
+            self.assertNotIn("torch.cuda.", source, name)
+            self.assertIn("device = resolve_torch_device(torch)", source, name)
+            self.assertIn(
+                "device=transformers_pipeline_device(self.device)", source, name
+            )
+            calls = [
+                node for node in ast.walk(tree)
+                if isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "resolve_torch_device"
+            ]
+            self.assertEqual(len(calls), 1, name)
+
+
+if __name__ == "__main__":
+    unittest.main()
