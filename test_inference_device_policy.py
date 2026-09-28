@@ -121,6 +121,24 @@ class InferenceDevicePolicyTests(unittest.TestCase):
         self.assertEqual(policy.transformers_pipeline_device(Device("cuda")), 0)
         self.assertEqual(policy.transformers_pipeline_device(Device("cuda:3")), 3)
 
+    def test_gpu_admitted_runtime_failures_are_not_swallowed_by_retained_apps(self):
+        required_messages = (
+            'Error processing sub-batch: {e}',
+            "Error in 'addEmotions': {e}",
+            'Error processing with model {model}: {e}',
+            'Error initializing device: {e}',
+            'Error initializing DataProcessor or FileHandler: {e}',
+            'Error during file creation: {e}',
+        )
+        for name in APP_FILES:
+            source = (ROOT / name).read_text(encoding="utf-8")
+            self.assertIn("gpu_admission_requested,", source, name)
+            for message in required_messages:
+                index = source.index(message)
+                guard = source[max(0, index - 180):index]
+                self.assertIn("if gpu_admission_requested():", guard, (name, message))
+                self.assertIn("raise", guard, (name, message))
+
     def test_both_retained_apps_use_one_resolved_device_without_direct_cuda_probe(self):
         for name in APP_FILES:
             source = (ROOT / name).read_text(encoding="utf-8")
