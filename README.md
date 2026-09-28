@@ -43,12 +43,23 @@ This project is a powerful Python-based application designed for sentiment and e
 ## Installation
 
 ### Prerequisites
-- Python 3.7+
-- Required Python libraries:
+- Python 3.11+ is recommended for the current validation tooling.
+- Install the runtime libraries used by the retained application:
   ```bash
-  pip install pandas nltk transformers matplotlib
+  pip install pandas nltk transformers matplotlib spacy datasets torch pymysql ollama requests
+  python -m spacy download en_core_web_sm
   ```
+- Tkinter must also be available from your Python/OS installation.
 - Download the sentiment dataset as `sentiment_dataset.csv` and place it in the project directory.
+- If MySQL persistence is required, provide the password through the environment rather than source code:
+  ```bash
+  export SENTIMENT_DB_PASSWORD='...'
+  # Optional overrides:
+  # export SENTIMENT_DB_HOST='localhost'
+  # export SENTIMENT_DB_USER='root'
+  # export SENTIMENT_DB_NAME='SentimentAnalysis'
+  ```
+  The application keeps the historical local host/user/database defaults but deliberately has no password default.
 
 ### Clone the Repository
 ```bash
@@ -58,8 +69,10 @@ cd <repository_directory>
 
 ### Run the Application
 ```bash
-python app.py
+python "Sentiment Analysis.py"
 ```
+
+The repository also retains `Sentiment Analysis (Stable last code).py` as an equivalent historical application copy. Both now use the same centralized inference-device and database-configuration policy.
 
 ---
 
@@ -109,11 +122,7 @@ Displays the proportion of emotions across the dataset:
 ---
 
 ## Dependencies
-- `pandas`: For data manipulation and processing.
-- `nltk`: For sentiment analysis.
-- `transformers`: For Hugging Face emotion classification.
-- `matplotlib`: For data visualization.
-- `Tkinter`: For creating the interactive GUI.
+Core runtime dependencies include `pandas`, `nltk`, `transformers`, `torch`, `matplotlib`, `spacy`, `datasets`, `pymysql`, `ollama`, and `requests`; Tkinter is supplied by the Python/OS installation. Hugging Face model inference uses the centralized CPU/CUDA admission policy in `inference_device_policy.py`.
 
 ---
 
