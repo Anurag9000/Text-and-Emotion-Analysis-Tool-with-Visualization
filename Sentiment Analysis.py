@@ -16,6 +16,7 @@ import pymysql
 import csv
 from inference_device_policy import (
     best_cuda_index,
+    gpu_admission_requested,
     resolve_torch_device,
     transformers_pipeline_device,
 )
@@ -87,6 +88,8 @@ class FileHandler:
                         for emotion, scores in smallBatchScores.items():
                             emotionScores[emotion].extend(scores)
                     except Exception as e:
+                        if gpu_admission_requested():
+                            raise
                         print(f"Error processing sub-batch: {e}")
 
                 for emotion, scores in emotionScores.items():
@@ -106,6 +109,8 @@ class FileHandler:
             try:
                 return dataset.map(processBatch, batched=True)
             except Exception as e:
+                if gpu_admission_requested():
+                    raise
                 print(f"Error in 'addEmotions': {e}")
                 return dataset
 
@@ -240,6 +245,8 @@ class DataProcessor:
 
                         emotionScores[label][textIndex] += score
             except Exception as e:
+                if gpu_admission_requested():
+                    raise
                 print(f"Error processing with model {model}: {e}")
 
         averagedEmotionScores = {
@@ -732,6 +739,8 @@ def main():
         else:
             print("Using device: cpu")
     except Exception as e:
+        if gpu_admission_requested():
+            raise
         print(f"Error initializing device: {e}")
         return
 
@@ -758,6 +767,8 @@ def main():
         dataProcessor = DataProcessor(hf_dataset, device, apiModels, emotions)
         fileHandler = FileHandler(hf_dataset, allStopwords, emotions, dataProcessor)
     except Exception as e:
+        if gpu_admission_requested():
+            raise
         print(f"Error initializing DataProcessor or FileHandler: {e}")
         return
 
@@ -848,6 +859,8 @@ def main():
             politicalScoreProcessor.processTexts()
 
         except Exception as e:
+            if gpu_admission_requested():
+                raise
             print(f"Error during file creation: {e}")
             return
     else:
