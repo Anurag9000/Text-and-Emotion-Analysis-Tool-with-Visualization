@@ -14,6 +14,11 @@ import os
 import torch
 import pymysql
 import csv
+from inference_device_policy import (
+    best_cuda_index,
+    resolve_torch_device,
+    transformers_pipeline_device,
+)
 nlp = spacy.load("en_core_web_sm")
 
 class FileHandler:
@@ -171,7 +176,12 @@ class DataProcessor:
         self.dataset = dataset
         self.device = device
         self.apiPipelines = {
-            model: pipeline("text-classification", model=model, top_k=None, device=DataProcessor.getBestGpu())
+            model: pipeline(
+                "text-classification",
+                model=model,
+                top_k=None,
+                device=transformers_pipeline_device(self.device),
+            )
             for model in apiModels
         }
         self.emotions = emotions
@@ -201,14 +211,10 @@ class DataProcessor:
 
     @staticmethod
     def getBestGpu():
-        bestGpu = -1
-        maxFreeMemory = 0
-        for i in range(torch.cuda.device_count()):
-            freeMemory = torch.cuda.get_device_properties(i).total_memory - torch.cuda.memory_allocated(i)
-            if freeMemory > maxFreeMemory:
-                maxFreeMemory = freeMemory
-                bestGpu = i
-        return bestGpu
+        # Compatibility wrapper for callers that still expect an integer
+        # Transformers device index. The central helper checks scheduler CPU
+        # admission and executes a real CUDA operation before returning >= 0.
+        return best_cuda_index(torch)
 
     def calculateToneImpact(self, batch):
         tones = [SentimentIntensityAnalyzer().polarity_scores(text)['compound'] for text in batch['text']]
@@ -720,13 +726,11 @@ def main():
         return
 
     try:
-        bestGpu = DataProcessor.getBestGpu()
-        if bestGpu != -1:
-            device = torch.device(f"cuda:{bestGpu}")
-            print(f"Using GPU: {bestGpu}")
+        device = resolve_torch_device(torch)
+        if device.type == "cuda":
+            print(f"Using GPU: {device.index if device.index is not None else 0}")
         else:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            print(f"Using device: {device}")
+            print("Using device: cpu")
     except Exception as e:
         print(f"Error initializing device: {e}")
         return
