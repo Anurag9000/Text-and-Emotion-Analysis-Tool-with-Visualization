@@ -163,9 +163,17 @@ def audit() -> dict[str, object]:
 
     for path in text_files:
         relative = path.relative_to(ROOT).as_posix()
-        for line_number, line in enumerate(
-            path.read_text(encoding="utf-8", errors="replace").splitlines(), 1
-        ):
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+        in_fence = False
+        for line_number, line in enumerate(lines, 1):
+            if path.suffix.lower() == ".md" and line.lstrip().startswith("```"):
+                in_fence = not in_fence
+                continue
+            # TXT files in this repository include retained code/model snippets.
+            # Markdown prose is documentation, so only fenced code blocks are
+            # treated as code-like retained material.
+            if path.suffix.lower() == ".md" and not in_fence:
+                continue
             for kind, pattern in TEXT_TRAINING_PATTERNS:
                 if pattern.search(line):
                     findings.append(
