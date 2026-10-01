@@ -196,8 +196,8 @@ class InferenceDevicePolicyTests(unittest.TestCase):
         for name in APP_FILES:
             source = (ROOT / name).read_text(encoding="utf-8")
             configure = source.index("SPACY_ACCELERATION = configure_optional_spacy_gpu(spacy)")
-            model_load = source.index('nlp = spacy.load("en_core_web_sm")')
-            self.assertLess(configure, model_load, name)
+            load_position = source.index('nlp = spacy.load("en_core_web_sm")')
+            self.assertLess(configure, load_position, name)
     def test_transformers_device_convention(self):
         self.assertEqual(policy.transformers_pipeline_device(Device("cpu")), -1)
         self.assertEqual(policy.transformers_pipeline_device(Device("cuda")), 0)
