@@ -116,6 +116,62 @@ class InferenceDevicePolicyTests(unittest.TestCase):
             "cpu",
         )
 
+    def test_cpu_admission_never_imports_optional_dataframe_gpu_stack(self):
+        importer = mock.Mock(side_effect=AssertionError("accelerator import attempted"))
+        status = policy.enable_optional_dataframe_acceleration(
+            {"CPU_ONLY": "1", "CUDA_VISIBLE_DEVICES": "0"}, importer=importer
+        )
+        self.assertEqual(status["backend"], "pandas")
+        self.assertFalse(status["requested"])
+        self.assertFalse(status["enabled"])
+        importer.assert_not_called()
+
+    def test_usable_cupy_installs_cudf_pandas_before_application_import(self):
+        probe = types.SimpleNamespace(fill=mock.Mock())
+        cp = types.SimpleNamespace(
+            uint8=object(),
+            empty=mock.Mock(return_value=probe),
+            cuda=types.SimpleNamespace(runtime=types.SimpleNamespace(
+                getDeviceCount=mock.Mock(return_value=1),
+                deviceSynchronize=mock.Mock(),
+            )),
+        )
+        cudf_pandas = types.SimpleNamespace(install=mock.Mock())
+        modules = {"cupy": cp, "cudf.pandas": cudf_pandas}
+        status = policy.enable_optional_dataframe_acceleration(
+            {"CUDA_VISIBLE_DEVICES": "0"}, importer=lambda name: modules[name]
+        )
+        self.assertEqual(status["backend"], "cudf.pandas")
+        self.assertTrue(status["enabled"])
+        cp.empty.assert_called_once_with((1,), dtype=cp.uint8)
+        probe.fill.assert_called_once_with(1)
+        cp.cuda.runtime.deviceSynchronize.assert_called_once_with()
+        cudf_pandas.install.assert_called_once_with()
+
+    def test_unusable_optional_cupy_falls_back_without_importing_cudf(self):
+        cp = types.SimpleNamespace(
+            uint8=object(),
+            empty=mock.Mock(side_effect=RuntimeError("driver mismatch")),
+            cuda=types.SimpleNamespace(runtime=types.SimpleNamespace(
+                getDeviceCount=mock.Mock(return_value=1),
+                deviceSynchronize=mock.Mock(),
+            )),
+        )
+        importer = mock.Mock(side_effect=lambda name: cp if name == "cupy" else (_ for _ in ()).throw(AssertionError("cudf imported")))
+        status = policy.enable_optional_dataframe_acceleration(
+            {"CUDA_VISIBLE_DEVICES": "0"}, importer=importer
+        )
+        self.assertEqual(status["backend"], "pandas")
+        self.assertEqual(status["reason"], "cupy_unusable")
+        self.assertEqual(importer.call_args_list, [mock.call("cupy")])
+
+    def test_retained_apps_bootstrap_dataframe_acceleration_before_pandas(self):
+        for name in APP_FILES:
+            source = (ROOT / name).read_text(encoding="utf-8")
+            self.assertIn("enable_optional_dataframe_acceleration,", source, name)
+            bootstrap = source.index("DATAFRAME_ACCELERATION = enable_optional_dataframe_acceleration()")
+            pandas_import = source.index("import pandas as pd")
+            self.assertLess(bootstrap, pandas_import, name)
     def test_transformers_device_convention(self):
         self.assertEqual(policy.transformers_pipeline_device(Device("cpu")), -1)
         self.assertEqual(policy.transformers_pipeline_device(Device("cuda")), 0)
