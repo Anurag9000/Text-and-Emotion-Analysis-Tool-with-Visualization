@@ -9,18 +9,20 @@ from tkinter import ttk
 from nltk.corpus import stopwords
 import spacy
 from datasets import Dataset
+from inference_device_policy import (
+    best_cuda_index,
+    enable_optional_dataframe_acceleration,
+    gpu_admission_requested,
+    resolve_torch_device,
+    transformers_pipeline_device,
+)
+DATAFRAME_ACCELERATION = enable_optional_dataframe_acceleration()
 import pandas as pd
 import os
 import torch
 import pymysql
 import csv
 from application_config import database_config_from_env
-from inference_device_policy import (
-    best_cuda_index,
-    gpu_admission_requested,
-    resolve_torch_device,
-    transformers_pipeline_device,
-)
 nlp = spacy.load("en_core_web_sm")
 
 class FileHandler:
