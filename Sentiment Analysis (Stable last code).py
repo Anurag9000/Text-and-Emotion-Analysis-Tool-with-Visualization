@@ -11,6 +11,7 @@ import spacy
 from datasets import Dataset
 from inference_device_policy import (
     best_cuda_index,
+    configure_optional_spacy_gpu,
     enable_optional_dataframe_acceleration,
     gpu_admission_requested,
     resolve_torch_device,
@@ -23,6 +24,7 @@ import torch
 import pymysql
 import csv
 from application_config import database_config_from_env
+SPACY_ACCELERATION = configure_optional_spacy_gpu(spacy)
 nlp = spacy.load("en_core_web_sm")
 
 class FileHandler:
