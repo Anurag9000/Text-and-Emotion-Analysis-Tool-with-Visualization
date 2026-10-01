@@ -62,6 +62,38 @@ class InferenceOnlyAuthorityTests(unittest.TestCase):
                 payload = authority.audit()
             self.assertTrue(payload["complete"], payload["unresolved"])
 
+    def test_markdown_prose_mentions_do_not_create_training_surface(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            make_required_tree(root)
+            (root / "audit.md").write_text(
+                "This audit mentions `.fit(` and `.backward(` only as forbidden examples.\n",
+                encoding="utf-8",
+            )
+            with mock.patch.object(authority, "ROOT", root):
+                payload = authority.audit()
+            self.assertTrue(payload["complete"], payload["unresolved"])
+
+    def test_markdown_fenced_training_code_still_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            make_required_tree(root)
+            (root / "example.md").write_text(
+                "Example:\n```python\nmodel.fit(data)\n```\n",
+                encoding="utf-8",
+            )
+            with mock.patch.object(authority, "ROOT", root):
+                payload = authority.audit()
+            self.assertFalse(payload["complete"])
+            self.assertTrue(any(
+                row["kind"] == "textual_fit_call" for row in payload["training_findings"]
+            ))
+
+    def test_duplicate_application_sources_are_byte_identical(self):
+        root = Path(__file__).resolve().parent
+        primary = (root / "Sentiment Analysis.py").read_bytes()
+        stable = (root / "Sentiment Analysis (Stable last code).py").read_bytes()
+        self.assertEqual(primary, stable)
     def test_python_optimizer_call_still_fails_closed(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
