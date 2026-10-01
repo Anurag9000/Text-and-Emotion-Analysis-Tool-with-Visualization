@@ -71,6 +71,28 @@ def enable_optional_dataframe_acceleration(
         return {"requested": True, "enabled": False, "backend": "pandas", "reason": "cudf_unavailable"}
     return {"requested": True, "enabled": True, "backend": "cudf.pandas", "reason": None}
 
+
+def configure_optional_spacy_gpu(
+    spacy_module: Any, environ: Mapping[str, str] | None = None
+) -> dict[str, object]:
+    """Prefer spaCy GPU ops when available without making them mandatory.
+
+    CPU-admitted workers never call spaCy GPU APIs. Transformer model
+    placement remains independently governed by the Torch CUDA probe.
+    """
+    if _check_admission(environ):
+        return {"requested": False, "enabled": False, "backend": "cpu", "reason": "cpu_admission"}
+    try:
+        enabled = bool(spacy_module.prefer_gpu())
+    except (RuntimeError, OSError, AttributeError, TypeError, ValueError, ImportError):
+        enabled = False
+    return {
+        "requested": True,
+        "enabled": enabled,
+        "backend": "gpu" if enabled else "cpu",
+        "reason": None if enabled else "spacy_gpu_unavailable",
+    }
+
 def _cuda_probe(torch_module: Any, index: int) -> bool:
     device = f"cuda:{index}"
     try:
