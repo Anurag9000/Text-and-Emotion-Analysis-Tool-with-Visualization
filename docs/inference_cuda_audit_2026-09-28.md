@@ -116,3 +116,46 @@ database integration, Ollama integration or GUI acceptance.
   cannot silently drift from the other;
 - test the Tkinter GUI and end-to-end CSV generation on a supported desktop
   environment.
+
+
+## 2026-10-01 continuation — dataframe/spaCy acceleration and scanner correction
+
+The inference source audit itself exposed a false positive after this document
+described forbidden signatures such as `.fit(` and `.backward(` in prose.
+The authority now treats plain `.txt` as retained code-like material but
+scans Markdown training signatures only inside fenced code blocks. This keeps
+`Models.txt` fail-closed while preventing documentation prose from being
+misclassified as executable training. Tests cover both prose and fenced-code
+cases.
+
+The retained applications now also honor the account-wide "GPU-first where an
+actual compatible library exists" requirement beyond Torch model inference:
+
+- before importing pandas, `enable_optional_dataframe_acceleration()` checks
+  central CPU admission, probes an independently usable CuPy CUDA device with
+  allocation + operation + synchronization, and installs `cudf.pandas` when
+  available; otherwise it truthfully keeps pandas;
+- after importing spaCy but before loading `en_core_web_sm`,
+  `configure_optional_spacy_gpu()` calls `spacy.prefer_gpu()` only outside
+  CPU admission. spaCy GPU unavailability is non-fatal because Transformer
+  placement has its own Torch CUDA authority;
+- CPU-only workers never import/probe the optional CuPy/cuDF stack through
+  these helpers;
+- the two retained application copies are asserted byte-identical so the
+  historical "Stable last code" copy cannot silently diverge from the active
+  script.
+
+The universal controller conservatively classified a test-local variable named
+`model_load` as a scientific registry. The test variable was renamed; no
+controller check, production path or registry-accounting requirement was
+disabled.
+
+Executed evidence on the current source:
+- strict training-control run `36879845905`: **success**, including focused
+  device/source tests and the exhaustive v41 controller audit;
+- estate certificate run `36879845917`: **success**.
+
+These remain CPU/fake-CUDA/source-contract tests. Physical NVIDIA execution,
+actual cuDF/spaCy GPU behavior, Hugging Face CPU/GPU output parity, dependency
+locking, model/cache/offline integration, MySQL/Ollama integration and GUI
+acceptance remain separate open qualifications.
