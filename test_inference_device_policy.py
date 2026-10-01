@@ -172,6 +172,32 @@ class InferenceDevicePolicyTests(unittest.TestCase):
             bootstrap = source.index("DATAFRAME_ACCELERATION = enable_optional_dataframe_acceleration()")
             pandas_import = source.index("import pandas as pd")
             self.assertLess(bootstrap, pandas_import, name)
+    def test_cpu_admission_never_calls_spacy_gpu_preference(self):
+        spacy = types.SimpleNamespace(prefer_gpu=mock.Mock(side_effect=AssertionError("spaCy GPU touched")))
+        status = policy.configure_optional_spacy_gpu(
+            spacy, {"TRAINING_CONTROL_BACKEND": "cpu", "CUDA_VISIBLE_DEVICES": "0"}
+        )
+        self.assertEqual(status["backend"], "cpu")
+        self.assertFalse(status["requested"])
+        spacy.prefer_gpu.assert_not_called()
+
+    def test_spacy_gpu_is_preferred_when_available_but_optional(self):
+        spacy = types.SimpleNamespace(prefer_gpu=mock.Mock(return_value=True))
+        status = policy.configure_optional_spacy_gpu(spacy, {"CUDA_VISIBLE_DEVICES": "0"})
+        self.assertTrue(status["enabled"])
+        self.assertEqual(status["backend"], "gpu")
+        spacy.prefer_gpu.assert_called_once_with()
+        spacy = types.SimpleNamespace(prefer_gpu=mock.Mock(return_value=False))
+        status = policy.configure_optional_spacy_gpu(spacy, {"CUDA_VISIBLE_DEVICES": "0"})
+        self.assertFalse(status["enabled"])
+        self.assertEqual(status["backend"], "cpu")
+
+    def test_retained_apps_prefer_spacy_gpu_before_loading_model(self):
+        for name in APP_FILES:
+            source = (ROOT / name).read_text(encoding="utf-8")
+            configure = source.index("SPACY_ACCELERATION = configure_optional_spacy_gpu(spacy)")
+            model_load = source.index('nlp = spacy.load("en_core_web_sm")')
+            self.assertLess(configure, model_load, name)
     def test_transformers_device_convention(self):
         self.assertEqual(policy.transformers_pipeline_device(Device("cpu")), -1)
         self.assertEqual(policy.transformers_pipeline_device(Device("cuda")), 0)
