@@ -6,6 +6,7 @@ authoritative; a GPU-admitted child must prove a usable Torch CUDA device.
 """
 from __future__ import annotations
 
+import importlib
 import os
 from typing import Mapping, Any
 
@@ -38,6 +39,37 @@ def _check_admission(environ: Mapping[str, str] | None = None) -> bool:
         raise RuntimeError("conflicting CPU and GPU scheduler admission")
     return cpu
 
+
+
+def enable_optional_dataframe_acceleration(
+    environ: Mapping[str, str] | None = None,
+    *,
+    importer: Any = importlib.import_module,
+) -> dict[str, object]:
+    """Install cudf.pandas before pandas import when usable CUDA is available.
+
+    This is optional acceleration for dataframe preprocessing, not a training
+    or model-placement authority. CPU admission prevents even importing CuPy/
+    cuDF. Missing or unusable optional RAPIDS packages fall back to pandas.
+    """
+    if _check_admission(environ):
+        return {"requested": False, "enabled": False, "backend": "pandas", "reason": "cpu_admission"}
+    try:
+        cp = importer("cupy")
+        if int(cp.cuda.runtime.getDeviceCount()) < 1:
+            return {"requested": True, "enabled": False, "backend": "pandas", "reason": "no_cupy_device"}
+        probe = cp.empty((1,), dtype=cp.uint8)
+        probe.fill(1)
+        cp.cuda.runtime.deviceSynchronize()
+        del probe
+    except (ImportError, RuntimeError, OSError, AttributeError, TypeError, ValueError):
+        return {"requested": True, "enabled": False, "backend": "pandas", "reason": "cupy_unusable"}
+    try:
+        cudf_pandas = importer("cudf.pandas")
+        cudf_pandas.install()
+    except (ImportError, RuntimeError, OSError, AttributeError, TypeError, ValueError):
+        return {"requested": True, "enabled": False, "backend": "pandas", "reason": "cudf_unavailable"}
+    return {"requested": True, "enabled": True, "backend": "cudf.pandas", "reason": None}
 
 def _cuda_probe(torch_module: Any, index: int) -> bool:
     device = f"cuda:{index}"
